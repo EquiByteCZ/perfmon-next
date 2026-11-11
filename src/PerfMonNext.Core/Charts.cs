@@ -18,7 +18,16 @@ public sealed class ChartFrame
     public double? XMax { get; init; }
     public double? YMin { get; init; }
     public double? YMax { get; init; }
+    public bool IsBar { get; init; }
     public required IReadOnlyList<EncodedSeries> Series { get; init; }
+    public IReadOnlyList<BarValue> Bars { get; init; } = [];
+}
+
+public sealed class BarValue
+{
+    public required string Label { get; init; }
+    public required double Value { get; init; }
+    public required string Color { get; init; }
 }
 
 public static class ScaleSuggester
@@ -146,6 +155,77 @@ public static class ChartFrames
             Xs = xs,
             Ys = ys
         };
+    }
+
+    public static IReadOnlyList<ChartFrame> BuildBars(
+        IReadOnlyList<SeriesSnapshot> series,
+        ChartGrouping grouping,
+        bool showLegend)
+    {
+        var visible = series.Where(item => item.Visible).ToList();
+        if (visible.Count == 0)
+            return [];
+
+        IEnumerable<IGrouping<string, SeriesSnapshot>> groups = grouping switch
+        {
+            ChartGrouping.Combined => visible.GroupBy(_ => "All counters"),
+            ChartGrouping.ByMachine => visible.GroupBy(item => item.MachineDisplay, StringComparer.OrdinalIgnoreCase),
+            _ => visible.GroupBy(item => item.Path.Category + " · " + item.Path.Counter, StringComparer.OrdinalIgnoreCase)
+        };
+
+        var frames = new List<ChartFrame>();
+        foreach (var group in groups.OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase))
+        {
+            var bars = new List<BarValue>();
+            foreach (var item in group)
+            {
+                if (LastFinite(item) is not double value)
+                    continue;
+                bars.Add(new BarValue { Label = Legend(item, grouping), Value = value, Color = item.Color });
+            }
+
+            if (bars.Count == 0)
+                continue;
+
+            var min = bars.Min(bar => bar.Value);
+            var max = bars.Max(bar => bar.Value);
+            var low = min > 0 ? 0 : min - Math.Max(Math.Abs(min) * 0.08, 1);
+            var high = max < 0 ? 0 : max + Math.Max(Math.Abs(max) * 0.08, 1);
+            if (high <= low)
+                high = low + 1;
+            var prefix = grouping switch
+            {
+                ChartGrouping.Combined => "bar-all",
+                ChartGrouping.ByMachine => "bar-machine",
+                _ => "bar-counter"
+            };
+            frames.Add(new ChartFrame
+            {
+                Key = prefix + ":" + group.Key,
+                Title = group.Key,
+                ShowLegend = showLegend && bars.Count is > 0 and <= 12,
+                IsBar = true,
+                XMin = -0.5,
+                XMax = bars.Count - 0.5,
+                YMin = low,
+                YMax = high,
+                Series = [],
+                Bars = bars
+            });
+        }
+
+        return frames;
+    }
+
+    public static double? LastFinite(SeriesSnapshot snapshot)
+    {
+        for (var i = snapshot.Samples.Count - 1; i >= 0; i--)
+        {
+            if (snapshot.Samples[i].Value is double value && double.IsFinite(value))
+                return value * snapshot.Scale;
+        }
+
+        return null;
     }
 
     public static string Legend(SeriesSnapshot snapshot, ChartGrouping grouping)

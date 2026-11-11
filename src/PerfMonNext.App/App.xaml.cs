@@ -18,9 +18,10 @@ public partial class App : Application
         var vault = new MemoryCredentialVault();
         var protector = new DpapiSecretProtector();
         AppFiles.TryImportCredentials(vault, protector);
-        var probe = new WindowsCounterReader(vault);
+        var winrm = new WinRmClient(vault);
+        var probe = new RoutingCounterProbe(new WindowsCounterReader(vault), new WinRmCounterProbe(winrm));
         var engine = new SamplingEngine(new GuardedCounterPoller(probe));
-        var vm = new MainViewModel(engine, probe, new WindowsCounterCatalog(vault), vault, protector, new RelogBlgConverter());
+        var vm = new MainViewModel(engine, probe, new WindowsCounterCatalog(vault, winrm), vault, protector, new RelogBlgConverter());
         new MainWindow(vm).Show();
     }
 }

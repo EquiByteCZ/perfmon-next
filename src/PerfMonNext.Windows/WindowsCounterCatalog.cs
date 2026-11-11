@@ -6,78 +6,136 @@ namespace PerfMonNext.Windows;
 public sealed class WindowsCounterCatalog
 {
     private readonly ICredentialVault _vault;
+    private readonly WinRmClient _winRm;
 
-    public WindowsCounterCatalog(ICredentialVault vault) => _vault = vault;
+    public WindowsCounterCatalog(ICredentialVault vault, WinRmClient winRm)
+    {
+        _vault = vault;
+        _winRm = winRm;
+    }
 
     public CounterCatalog Load(MachineTarget machine, CancellationToken cancellationToken)
     {
+        if (machine.Connection == ConnectionMode.WinRm)
+            return _winRm.LoadCatalog(machine, cancellationToken);
+
+        // Names only. GetInstanceNames() on the objects returned by GetCategories(machine)
+        // is often empty for remote multi-instance sets (Hyper-V logical processors included),
+        // which used to store the set with zero counters. Details are loaded when the set is selected.
         IpcConnector.Ensure(machine, _vault);
-        var pcMachine = MachineHost.ToCounterMachine(machine.Host);
-        var categories = PerformanceCounterCategory.GetCategories(pcMachine);
-        var sets = new List<CounterSetInfo>(categories.Length);
-        var skipped = 0;
-        foreach (var category in categories.OrderBy(item => item.CategoryName, StringComparer.OrdinalIgnoreCase))
+        cancellationToken.ThrowIfCancellationRequested();
+        var categories = PerformanceCounterCategory.GetCategories(MachineHost.ToCounterMachine(machine.Host));
+        var sets = categories
+            .Select(category => category.CategoryName)
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+            .Select(name => new CounterSetInfo { Name = name, DetailsLoaded = false, MultiInstance = true })
+            .ToList();
+        return new CounterCatalog { SourceHost = machine.Host, Sets = sets };
+    }
+
+    public CounterSetInfo LoadSet(MachineTarget machine, string categoryName, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (machine.Connection == ConnectionMode.WinRm)
+            return _winRm.LoadSet(machine, categoryName, cancellationToken);
+
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            var set = LoadPdhSet(machine, categoryName);
+            if (set.Counters.Count > 0 || MachineHost.IsLocal(machine.Host))
+                return set;
+        }
+        catch (Exception) when (!MachineHost.IsLocal(machine.Host))
+        {
+            // Fall through to WinRM. Remote Registry / PDH is blocked on a lot of cluster nodes.
+        }
+
+        var viaWinRm = _winRm.LoadSet(machine, categoryName, cancellationToken);
+        if (viaWinRm.Counters.Count > 0)
+            machine.Connection = ConnectionMode.WinRm;
+        return viaWinRm;
+    }
+
+    private CounterSetInfo LoadPdhSet(MachineTarget machine, string categoryName)
+    {
+        IpcConnector.Ensure(machine, _vault);
+        var category = new PerformanceCounterCategory(categoryName, MachineHost.ToCounterMachine(machine.Host));
+        var rows = new List<CounterSetBuilder.SampleRow>();
+        try
+        {
+            foreach (InstanceDataCollection column in category.ReadCategory().Values)
+            {
+                if (column.Count == 0 && !string.IsNullOrWhiteSpace(column.CounterName))
+                {
+                    rows.Add(new CounterSetBuilder.SampleRow(column.CounterName, ""));
+                    continue;
+                }
+
+                foreach (InstanceData sample in column.Values)
+                    rows.Add(new CounterSetBuilder.SampleRow(column.CounterName, sample.InstanceName ?? ""));
+            }
+        }
+        catch
+        {
+            rows.Clear();
+        }
+
+        if (!rows.Any(row => !string.IsNullOrWhiteSpace(row.Counter)))
+            rows.AddRange(ReadWithCountersApi(category));
+
+        return CounterSetBuilder.Build(categoryName, null, rows, rows.Any(row => !string.IsNullOrEmpty(row.Instance)));
+    }
+
+    private static IEnumerable<CounterSetBuilder.SampleRow> ReadWithCountersApi(PerformanceCounterCategory category)
+    {
+        PerformanceCounter[]? counters = null;
+        try
+        {
+            if (category.CategoryType == PerformanceCounterCategoryType.SingleInstance)
+            {
+                counters = category.GetCounters();
+                return counters.Select(counter => new CounterSetBuilder.SampleRow(counter.CounterName, "")).ToList();
+            }
+
+            string[] instances;
             try
             {
-                var multi = category.CategoryType != PerformanceCounterCategoryType.SingleInstance;
-                string[] instances = [];
-                PerformanceCounter[] counters;
-                if (multi)
+                instances = category.GetInstanceNames();
+            }
+            catch (InvalidOperationException)
+            {
+                instances = [];
+            }
+
+            if (instances.Length == 0)
+            {
+                try
                 {
-                    instances = category.GetInstanceNames();
-                    Array.Sort(instances, (left, right) =>
-                    {
-                        var leftTotal = left.Equals("_Total", StringComparison.OrdinalIgnoreCase);
-                        var rightTotal = right.Equals("_Total", StringComparison.OrdinalIgnoreCase);
-                        if (leftTotal != rightTotal)
-                            return leftTotal ? -1 : 1;
-                        return string.Compare(left, right, StringComparison.OrdinalIgnoreCase);
-                    });
-                    counters = instances.Length == 0
-                        ? []
-                        : category.GetCounters(instances[0]);
+                    counters = category.GetCounters("_Total");
+                    return counters.Select(counter => new CounterSetBuilder.SampleRow(counter.CounterName, "_Total")).ToList();
                 }
-                else
+                catch
                 {
                     counters = category.GetCounters();
+                    return counters.Select(counter => new CounterSetBuilder.SampleRow(counter.CounterName, "")).ToList();
                 }
+            }
 
-                sets.Add(new CounterSetInfo
-                {
-                    Name = category.CategoryName,
-                    MultiInstance = multi,
-                    Instances = instances,
-                    Counters = counters
-                        .Select(counter => counter.CounterName)
-                        .Distinct(StringComparer.OrdinalIgnoreCase)
-                        .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
-                        .Select(name => new CounterInfo { Name = name })
-                        .ToList()
-                });
-
+            var probe = instances.FirstOrDefault(name => name.Equals("_Total", StringComparison.OrdinalIgnoreCase)) ?? instances[0];
+            counters = category.GetCounters(probe);
+            var names = counters.Select(counter => counter.CounterName).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            return names.SelectMany(name => instances.Select(instance => new CounterSetBuilder.SampleRow(name, instance))).ToList();
+        }
+        finally
+        {
+            if (counters is not null)
+            {
                 foreach (var counter in counters)
                     counter.Dispose();
             }
-            catch
-            {
-                skipped++;
-                sets.Add(new CounterSetInfo
-                {
-                    Name = category.CategoryName,
-                    MultiInstance = true,
-                    Help = "This set is installed, but its counters could not be listed."
-                });
-            }
         }
-
-        return new CounterCatalog
-        {
-            SourceHost = machine.Host,
-            Warning = skipped == 0 ? null : skipped + " counter sets could not be listed (permissions or an empty instance list).",
-            Sets = sets
-        };
     }
 
     public string ReadHelp(MachineTarget machine, string category, string counter)

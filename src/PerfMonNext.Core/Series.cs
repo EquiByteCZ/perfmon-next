@@ -2,7 +2,7 @@ namespace PerfMonNext.Core;
 
 public readonly record struct SamplePoint(DateTimeOffset Timestamp, double? Value);
 
-public readonly record struct SeriesStats(double? Last, double? Min, double? Max, double? Average, int Count, double? RawMaxAbs)
+public readonly record struct SeriesStats(double? Last, double? Min, double? Max, double? Average, int Count, double? RawMaxAbs, TimeSpan? Duration = null)
 {
     public static SeriesStats FromSamples(IReadOnlyList<SamplePoint> samples, double scale)
     {
@@ -34,9 +34,17 @@ public readonly record struct SeriesStats(double? Last, double? Min, double? Max
             count++;
         }
 
+        var duration = samples.Count switch
+        {
+            0 => (TimeSpan?)null,
+            1 => TimeSpan.Zero,
+            _ => samples[^1].Timestamp - samples[0].Timestamp
+        };
+        if (duration is TimeSpan span && span < TimeSpan.Zero)
+            duration = TimeSpan.Zero;
         if (count == 0)
-            return new SeriesStats(null, null, null, null, 0, null);
-        return new SeriesStats(last, min, max, sum / count, count, rawMax);
+            return new SeriesStats(null, null, null, null, 0, null, duration);
+        return new SeriesStats(last, min, max, sum / count, count, rawMax, duration);
     }
 }
 
@@ -359,5 +367,13 @@ public static class ValueFormat
         if (abs >= 1)
             return number.ToString("0.##", System.Globalization.CultureInfo.CurrentCulture);
         return number.ToString("0.####", System.Globalization.CultureInfo.CurrentCulture);
+    }
+
+    public static string FormatDuration(TimeSpan? span)
+    {
+        if (span is null)
+            return "—";
+        var value = span.Value < TimeSpan.Zero ? TimeSpan.Zero : span.Value;
+        return value.TotalHours >= 1 ? value.ToString(@"h\:mm\:ss") : value.ToString(@"m\:ss");
     }
 }

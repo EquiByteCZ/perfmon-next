@@ -38,6 +38,24 @@ The app reads as the signed-in user unless a machine is set to different credent
 
 If Windows already has a session to that host as someone else, the connect fails with a message that includes `net use \\host /delete`.
 
+### WinRM, when PDH is blocked
+
+Each machine has a **Link** choice:
+
+- **PDH** is the classic remote-counter path (Remote Registry, the firewall groups above).
+- **WinRM** runs `Get-Counter` on the target through `Invoke-Command`. It does not use `Get-Counter -ComputerName`, because that switch still goes through PDH.
+
+If a remote PDH read is denied or the host is unreachable, the next sample is tried over WinRM. When that succeeds, the machine switches to WinRM and stays there. Selecting a counter set whose PDH detail read comes back empty also tries WinRM.
+
+On the target:
+
+```powershell
+Enable-PSRemoting -Force
+Enable-NetFirewallRule -DisplayGroup "Windows Remote Management"
+```
+
+The account needs to be in **Remote Management Users** or Administrators. Across a workgroup, add the caller to `TrustedHosts`. HTTP is TCP 5985. WinRM starts a PowerShell process per sample, so an interval of 2–5 seconds is more comfortable than 1 second. Alternate credentials are passed to `Invoke-Command -Credential` and are not written into the workspace file.
+
 ## Build and run
 
 Linux or macOS (compile and unit tests only):
@@ -69,7 +87,9 @@ GitHub Actions (`.github/workflows/build.yml`) runs the tests, cross-compiles on
 - Multi-instance counters accept `*` (every instance, expanded while sampling) or a prefix such as `chrome*`. `_Total` is the default when that instance exists.
 - Search matches counter set, counter, instance, and help text. Explain text is loaded from PDH when you select a counter. The **Starter** list is a built-in subset (processor, memory, disk, Hyper-V, CSV, SMB) for when a remote catalog is slow or down.
 - Paste a path such as `\Processor(_Total)\% Processor Time` or `\\node02\Memory\Available MBytes` and press **Add path**. A path that names a computer adds that computer.
+- **View** switches the main pane the way Performance Monitor does. **Line** is the time chart. **Bar** draws the latest value of each series as a column. **Stats** hides the chart and gives the whole pane to the table: last, min, max, average, and duration. The table stays under the chart in Line and Bar view. **Group** still splits those views by counter, by machine, or into one combined chart.
 - **Follow** keeps the time axis on the latest samples. Turn it off, then drag to pan and use the wheel to zoom. **Fit scales** picks a power-of-ten factor so each series lands near 10–100. The scale is applied for display; CSV export stores raw values. The sample workspace scales CSV read latency by 1000 so the chart shows milliseconds.
+- Clicking a counter set loads that set's counters and instances from the machine. The set list itself is only names; remote PDH often returns no instances from the bulk category query, which used to leave the counter list blank.
 - **F5** starts sampling. Ctrl+O / Ctrl+S open and save a workspace.
 
 `samples/azure-local-cluster.workspace.json` is a three-node workspace (CPU, memory, queue, Hyper-V logical processor, CSV read latency). Change the host names before you start it. Hyper-V and CSV counters exist only when those roles are installed; a missing counter is reported on that machine and the others continue.
@@ -87,7 +107,7 @@ GitHub Actions (`.github/workflows/build.yml`) runs the tests, cross-compiles on
 
 On this Linux machine:
 
-- `dotnet test -c Release` — 36 tests covering path parsing, workspace JSON (including a stripped password and the sample cluster file), ring-buffer stats, multi-machine sampling when one host fails, the single-flight poller, catalog search, chart grouping and gap encoding, CSV and PDH-CSV import, `.blg` command planning, and the credential file format.
+- `dotnet test -c Release` covers path parsing, workspace JSON, sampling, chart grouping, CSV and PDH-CSV, `.blg` planning, the counter-set builder, WinRM payload parsing, PDH-to-WinRM fallback, bar values, and sample duration.
 - `dotnet build src/PerfMonNext.App -c Release` — the WPF app and the PDH project compile with `EnableWindowsTargeting`.
 
 Not run here, because there is no Windows desktop session:

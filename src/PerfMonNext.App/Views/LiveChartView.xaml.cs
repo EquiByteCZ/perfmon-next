@@ -9,6 +9,7 @@ namespace PerfMonNext.Views;
 public partial class LiveChartView : UserControl
 {
     private bool _drawn;
+    private bool _wasBar;
 
     public static readonly DependencyProperty FrameProperty = DependencyProperty.Register(
         nameof(Frame),
@@ -55,6 +56,11 @@ public partial class LiveChartView : UserControl
     {
         if (!IsLoaded || Frame is null)
             return;
+        if (Frame.IsBar != _wasBar)
+        {
+            _drawn = false;
+            _wasBar = Frame.IsBar;
+        }
 
         var plot = Plot.Plot;
         AxisLimits? keep = null;
@@ -62,6 +68,21 @@ public partial class LiveChartView : UserControl
             keep = plot.Axes.GetLimits();
 
         plot.Clear();
+        ApplyTheme(plot);
+        if (Frame.IsBar)
+            DrawBars(plot);
+        else
+            DrawLines(plot, keep);
+
+        if (Frame.ShowLegend)
+            plot.ShowLegend(Alignment.UpperLeft);
+
+        Plot.Refresh();
+        _drawn = true;
+    }
+
+    private static void ApplyTheme(Plot plot)
+    {
         plot.FigureBackground.Color = ScottPlot.Color.FromHex("#10161D");
         plot.DataBackground.Color = ScottPlot.Color.FromHex("#10161D");
         plot.Axes.Color(ScottPlot.Color.FromHex("#8B9CB0"));
@@ -69,8 +90,11 @@ public partial class LiveChartView : UserControl
         plot.Legend.BackgroundColor = ScottPlot.Color.FromHex("#18212B");
         plot.Legend.FontColor = ScottPlot.Color.FromHex("#E8EEF5");
         plot.Legend.OutlineColor = ScottPlot.Color.FromHex("#2A3646");
+    }
 
-        foreach (var series in Frame.Series)
+    private void DrawLines(Plot plot, AxisLimits? keep)
+    {
+        foreach (var series in Frame!.Series)
         {
             if (series.Xs.Length == 0)
                 continue;
@@ -82,17 +106,36 @@ public partial class LiveChartView : UserControl
         }
 
         plot.Axes.DateTimeTicksBottom();
-        if (Frame.ShowLegend)
-            plot.ShowLegend(Alignment.UpperLeft);
-
         if (FollowLive && Frame.XMin is double x1 && Frame.XMax is double x2 && Frame.YMin is double y1 && Frame.YMax is double y2)
             plot.Axes.SetLimits(x1, x2, y1, y2);
-        else if (keep is { } saved)
+        else if (keep is { } saved && !Frame.IsBar)
             plot.Axes.SetLimits(saved.Left, saved.Right, saved.Bottom, saved.Top);
         else if (Frame.XMin is double fx1 && Frame.XMax is double fx2 && Frame.YMin is double fy1 && Frame.YMax is double fy2)
             plot.Axes.SetLimits(fx1, fx2, fy1, fy2);
+    }
 
-        Plot.Refresh();
-        _drawn = true;
+    private void DrawBars(Plot plot)
+    {
+        var bars = new List<Bar>();
+        var ticks = new ScottPlot.TickGenerators.NumericManual();
+        for (var i = 0; i < Frame!.Bars.Count; i++)
+        {
+            var item = Frame.Bars[i];
+            bars.Add(new Bar
+            {
+                Position = i,
+                Value = item.Value,
+                FillColor = ScottPlot.Color.FromHex(item.Color),
+                Label = item.Label,
+                Size = 0.72
+            });
+            ticks.AddMajor(i, item.Label);
+        }
+
+        if (bars.Count > 0)
+            plot.Add.Bars(bars);
+        plot.Axes.Bottom.TickGenerator = ticks;
+        if (Frame.XMin is double x1 && Frame.XMax is double x2 && Frame.YMin is double y1 && Frame.YMax is double y2)
+            plot.Axes.SetLimits(x1, x2, y1, y2);
     }
 }

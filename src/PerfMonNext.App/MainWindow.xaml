@@ -42,7 +42,9 @@
         <ComboBox Width="80" ItemsSource="{Binding IntervalChoices}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding SampleIntervalMs}" Margin="0,0,12,0"/>
         <Button Content="Start" Style="{StaticResource PrimaryButton}" Command="{Binding StartCommand}" IsEnabled="{Binding IsSampling, Converter={StaticResource InverseBool}}"/>
         <Button Content="Stop" Style="{StaticResource QuietButton}" Command="{Binding StopCommand}" IsEnabled="{Binding IsSampling}"/>
-        <TextBlock Text="Charts" Foreground="{StaticResource App.Muted}" VerticalAlignment="Center" Margin="8,0,6,0"/>
+        <TextBlock Text="View" Foreground="{StaticResource App.Muted}" VerticalAlignment="Center" Margin="8,0,6,0"/>
+        <ComboBox Width="90" ItemsSource="{Binding ViewChoices}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding DisplayMode}" Margin="0,0,12,0" ToolTip="Line chart, bar chart of the latest value, or the stats table."/>
+        <TextBlock Text="Group" Foreground="{StaticResource App.Muted}" VerticalAlignment="Center" Margin="0,0,6,0"/>
         <ComboBox Width="130" ItemsSource="{Binding GroupingChoices}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding Grouping}" Margin="0,0,12,0"/>
         <TextBlock Text="Window" Foreground="{StaticResource App.Muted}" VerticalAlignment="Center" Margin="0,0,6,0"/>
         <ComboBox Width="90" ItemsSource="{Binding WindowChoices}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding WindowSeconds}" Margin="0,0,12,0"/>
@@ -80,6 +82,8 @@
                 <TextBox Text="{Binding NewUserName, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,0" ToolTip="DOMAIN\user" Visibility="{Binding UseAlternateCredential, Converter={StaticResource BoolVis}}"/>
                 <PasswordBox x:Name="MachinePassword" Margin="0,6,0,0" ToolTip="Password is kept for this session, not in the workspace file." Visibility="{Binding UseAlternateCredential, Converter={StaticResource BoolVis}}"/>
                 <CheckBox Content="Remember on this PC" IsChecked="{Binding RememberCredential}" Margin="0,6,0,0" Visibility="{Binding UseAlternateCredential, Converter={StaticResource BoolVis}}"/>
+                <TextBlock Text="Connection" Foreground="{StaticResource App.Muted}" FontSize="11" Margin="0,6,0,0"/>
+                <ComboBox ItemsSource="{Binding ConnectionChoices}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding NewConnection}" Margin="0,2,0,0" ToolTip="PDH uses the remote registry. WinRM uses PowerShell Get-Counter on the target."/>
                 <Button Content="Add machine" Style="{StaticResource PrimaryButton}" Margin="0,8,0,0" HorizontalAlignment="Left" Click="AddMachine_Click"/>
               </StackPanel>
             </Border>
@@ -106,7 +110,9 @@
             <StackPanel Orientation="Horizontal" Margin="0,6,0,8">
               <Button Content="Test" Style="{StaticResource QuietButton}" Command="{Binding ProbeCommand}" Padding="10,4"/>
               <Button Content="Remove" Style="{StaticResource QuietButton}" Command="{Binding RemoveMachineCommand}" Padding="10,4"/>
-              <TextBlock Text="{Binding SelectedMachine.CredentialText}" Foreground="{StaticResource App.Muted}" VerticalAlignment="Center" FontSize="11"/>
+              <TextBlock Text="Link" Foreground="{StaticResource App.Muted}" VerticalAlignment="Center" FontSize="11" Margin="4,0,4,0"/>
+              <ComboBox Width="90" ItemsSource="{Binding ConnectionChoices}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding SelectedMachine.Connection}" ToolTip="PDH is the classic remote counter path. WinRM is used when that path is blocked."/>
+              <TextBlock Text="{Binding SelectedMachine.CredentialText}" Foreground="{StaticResource App.Muted}" VerticalAlignment="Center" FontSize="11" Margin="8,0,0,0"/>
             </StackPanel>
             <Separator Background="{StaticResource App.Border}" Margin="0,0,0,8"/>
             <DockPanel Margin="0,0,0,6">
@@ -142,7 +148,8 @@
               <ListBox ItemsSource="{Binding CatalogSets}" SelectedItem="{Binding SelectedSet}" DisplayMemberPath="Name"/>
             </DockPanel>
             <DockPanel Grid.Row="0" Grid.Column="1" Margin="4,0,0,0">
-              <TextBlock DockPanel.Dock="Top" Text="Counters" Foreground="{StaticResource App.Muted}" FontSize="11" Margin="0,0,0,4"/>
+              <TextBlock DockPanel.Dock="Top" Text="Counters" Foreground="{StaticResource App.Muted}" FontSize="11" Margin="0,0,0,2"/>
+              <TextBlock DockPanel.Dock="Top" Text="{Binding CounterStatus}" Foreground="{StaticResource App.Muted}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,4"/>
               <ListBox ItemsSource="{Binding Counters}" SelectedItem="{Binding SelectedCounter}">
                 <ListBox.ItemTemplate>
                   <DataTemplate>
@@ -169,11 +176,11 @@
 
       <Grid Grid.Column="2">
         <Grid.RowDefinitions>
-          <RowDefinition Height="*"/>
+          <RowDefinition Height="{Binding ChartLength}"/>
           <RowDefinition Height="6"/>
-          <RowDefinition Height="230" MinHeight="120"/>
+          <RowDefinition Height="{Binding StatsLength}" MinHeight="120"/>
         </Grid.RowDefinitions>
-        <Border Grid.Row="0" Background="{StaticResource App.Surface}" BorderBrush="{StaticResource App.Border}" BorderThickness="1" CornerRadius="8">
+        <Border Grid.Row="0" Background="{StaticResource App.Surface}" BorderBrush="{StaticResource App.Border}" BorderThickness="1" CornerRadius="8" Visibility="{Binding ShowChartSplitter, Converter={StaticResource BoolVis}}">
           <Grid>
             <ScrollViewer x:Name="ChartScroll" VerticalScrollBarVisibility="Auto" SizeChanged="ChartScroll_SizeChanged" Padding="8">
               <ItemsControl ItemsSource="{Binding Charts}">
@@ -193,7 +200,7 @@
                        HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{StaticResource App.Muted}" FontSize="14" TextWrapping="Wrap" MaxWidth="420" TextAlignment="Center"/>
           </Grid>
         </Border>
-        <GridSplitter Grid.Row="1" Height="6" HorizontalAlignment="Stretch"/>
+        <GridSplitter Grid.Row="1" Height="6" HorizontalAlignment="Stretch" Visibility="{Binding ShowChartSplitter, Converter={StaticResource BoolVis}}"/>
         <Border Grid.Row="2" Background="{StaticResource App.Surface}" BorderBrush="{StaticResource App.Border}" BorderThickness="1" CornerRadius="8" Padding="8">
           <DockPanel>
             <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
@@ -220,6 +227,7 @@
                 <DataGridTextColumn Header="Min" Binding="{Binding Minimum}" IsReadOnly="True" Width="80"/>
                 <DataGridTextColumn Header="Max" Binding="{Binding Maximum}" IsReadOnly="True" Width="80"/>
                 <DataGridTextColumn Header="Avg" Binding="{Binding Average}" IsReadOnly="True" Width="80"/>
+                <DataGridTextColumn Header="Duration" Binding="{Binding Duration}" IsReadOnly="True" Width="80"/>
                 <DataGridTextColumn Header="Scale" Binding="{Binding Scale, UpdateSourceTrigger=LostFocus, StringFormat=0.####}" Width="70"/>
                 <DataGridTemplateColumn Width="74">
                   <DataGridTemplateColumn.CellTemplate>

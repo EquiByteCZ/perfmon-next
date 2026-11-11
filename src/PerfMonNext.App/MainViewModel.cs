@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Windows;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -81,6 +82,17 @@ public partial class MainViewModel : ObservableObject
         new(ChartGrouping.ByMachine, "By machine"),
         new(ChartGrouping.Combined, "Combined")
     ];
+    public IReadOnlyList<Choice<DisplayMode>> ViewChoices { get; } =
+    [
+        new(DisplayMode.Line, "Line"),
+        new(DisplayMode.Bar, "Bar"),
+        new(DisplayMode.Stats, "Stats")
+    ];
+    public IReadOnlyList<Choice<ConnectionMode>> ConnectionChoices { get; } =
+    [
+        new(ConnectionMode.Pdh, "PDH"),
+        new(ConnectionMode.WinRm, "WinRM")
+    ];
 
     [ObservableProperty] private string workspaceName = "Local overview";
     [ObservableProperty] private string windowTitle = "PerfMon Next";
@@ -89,6 +101,10 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private ChartGrouping grouping = ChartGrouping.ByCounter;
     [ObservableProperty] private bool followLive = true;
     [ObservableProperty] private bool showLegend = true;
+    [ObservableProperty] private DisplayMode displayMode = DisplayMode.Line;
+    [ObservableProperty] private ConnectionMode defaultConnection = ConnectionMode.Pdh;
+    [ObservableProperty] private ConnectionMode newConnection = ConnectionMode.Pdh;
+    [ObservableProperty] private string counterStatus = "";
     [ObservableProperty] private bool isSampling;
     [ObservableProperty] private bool isOffline;
     [ObservableProperty] private bool isAddMachineOpen;
@@ -111,6 +127,9 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private CounterRowViewModel? selectedCounter;
 
     public double ChartItemHeight => Charts.Count <= 1 ? Math.Max(220, _chartViewportHeight) : 260;
+    public GridLength ChartLength => DisplayMode == DisplayMode.Stats ? new GridLength(0) : new GridLength(1, GridUnitType.Star);
+    public GridLength StatsLength => DisplayMode == DisplayMode.Stats ? new GridLength(1, GridUnitType.Star) : new GridLength(230);
+    public bool ShowChartSplitter => DisplayMode != DisplayMode.Stats;
     public string CurrentScopeId => ScopeAllMachines || SelectedMachine is null ? "*" : SelectedMachine.Id;
     public string ScopeHint => ScopeAllMachines
         ? "A tick adds the counter on every machine."
@@ -150,6 +169,20 @@ public partial class MainViewModel : ObservableObject
     }
 
     partial void OnFollowLiveChanged(bool value) => _workspace.FollowLive = value;
+    partial void OnDisplayModeChanged(DisplayMode value)
+    {
+        _workspace.DisplayMode = value;
+        OnPropertyChanged(nameof(ChartLength));
+        OnPropertyChanged(nameof(StatsLength));
+        OnPropertyChanged(nameof(ShowChartSplitter));
+        RefreshPresentation();
+    }
+
+    partial void OnDefaultConnectionChanged(ConnectionMode value)
+    {
+        _workspace.DefaultConnection = value;
+        NewConnection = value;
+    }
     partial void OnShowLegendChanged(bool value)
     {
         _workspace.ShowLegend = value;
@@ -170,7 +203,12 @@ public partial class MainViewModel : ObservableObject
             RebuildCounters();
     }
 
-    partial void OnSelectedSetChanged(CounterSetInfo? value) => RebuildCounters();
+    partial void OnSelectedSetChanged(CounterSetInfo? value)
+    {
+        RebuildCounters();
+        if (value is not null && CounterSetBuilder.NeedsDetailLoad(value))
+            _ = LoadSetDetailsAsync(value.Name);
+    }
     partial void OnSelectedCounterChanged(CounterRowViewModel? value) => RebuildInstances();
 
     [RelayCommand]
@@ -367,6 +405,7 @@ public partial class MainViewModel : ObservableObject
             Id = Ids.New("m"),
             Host = MachineHost.IsLocal(host) ? "." : host,
             DisplayName = string.IsNullOrWhiteSpace(NewDisplayName) ? MachineHost.Display(host, null) : NewDisplayName.Trim(),
+            Connection = NewConnection,
             Credential = new MachineCredential
             {
                 Mode = UseAlternateCredential ? CredentialMode.Alternate : CredentialMode.Current,
@@ -510,6 +549,9 @@ public partial class MainViewModel : ObservableObject
             item.Status = result.Status;
             item.StatusText = StatusLabel(result.Status);
             item.Detail = result.Message ?? "";
+            var target = _workspace.Machines.FirstOrDefault(machine => machine.Id == result.MachineId);
+            if (target is not null)
+                item.SetConnection(target.Connection);
         }
 
         RefreshPresentation();
@@ -519,11 +561,16 @@ public partial class MainViewModel : ObservableObject
     {
         _last = _store.Snapshot(_workspace, _workspace.VisibleWindow).ToList();
         SyncRows(_last);
-        var frames = ChartFrames.Build(_last, _workspace.ChartGrouping, _workspace.ShowLegend, _workspace.VisibleWindow);
+        var frames = DisplayMode switch
+        {
+            DisplayMode.Bar => ChartFrames.BuildBars(_last, _workspace.ChartGrouping, _workspace.ShowLegend),
+            DisplayMode.Stats => [],
+            _ => ChartFrames.Build(_last, _workspace.ChartGrouping, _workspace.ShowLegend, _workspace.VisibleWindow)
+        };
         SyncCharts(frames);
-        EmptyMessage = frames.Count == 0
-            ? (IsSampling ? "Waiting for a completed sample. Rate counters appear on the second read." : "Tick counters on the left, then press Start.")
-            : "";
+        EmptyMessage = DisplayMode == DisplayMode.Stats || frames.Count > 0
+            ? ""
+            : (IsSampling ? "Waiting for a completed sample. Rate counters appear on the second read." : "Tick counters on the left, then press Start.");
         var online = Machines.Count(machine => machine.Status == MachineStatus.Online);
         var bad = Machines.Count(machine => machine.Status is MachineStatus.Offline or MachineStatus.AccessDenied or MachineStatus.Error);
         StatusText = (IsSampling ? "Sampling" : IsOffline ? "Offline data" : "Stopped")
@@ -594,6 +641,8 @@ public partial class MainViewModel : ObservableObject
         Grouping = _workspace.ChartGrouping;
         FollowLive = _workspace.FollowLive;
         ShowLegend = _workspace.ShowLegend;
+        DisplayMode = _workspace.DisplayMode;
+        DefaultConnection = _workspace.DefaultConnection;
         EnsureChoice(IntervalChoices, SampleIntervalMs, SampleIntervalMs + " ms");
         EnsureChoice(WindowChoices, WindowSeconds, WindowSeconds + " s");
         BindMachines();
@@ -621,6 +670,67 @@ public partial class MainViewModel : ObservableObject
         foreach (var set in filtered)
             CatalogSets.Add(set);
         SelectedSet = CatalogSets.FirstOrDefault(set => set.Name == previous) ?? CatalogSets.FirstOrDefault();
+    }
+
+    private int _detailGeneration;
+
+    private async Task LoadSetDetailsAsync(string name)
+    {
+        var generation = Interlocked.Increment(ref _detailGeneration);
+        var machine = SelectedTarget();
+        if (machine is null || _currentCatalog.IsStarter)
+            return;
+        CounterStatus = "Loading counters for " + name + "…";
+        try
+        {
+            var details = await Task.Run(() => _catalog.LoadSet(machine, name, CancellationToken.None)).ConfigureAwait(true);
+            if (generation != _detailGeneration || SelectedSet?.Name.Equals(name, StringComparison.OrdinalIgnoreCase) != true)
+                return;
+            var target = SelectedTarget();
+            if (target is not null && SelectedMachine is not null)
+                SelectedMachine.SetConnection(target.Connection);
+            ReplaceSet(details);
+            CounterStatus = details.Counters.Count == 0
+                ? "No counters were returned for " + name + ". If this is a remote machine, switch the connection to WinRM and reload."
+                : details.Counters.Count + " counters";
+        }
+        catch (Exception ex)
+        {
+            if (generation == _detailGeneration)
+                CounterStatus = ex.Message;
+        }
+    }
+
+    private void ReplaceSet(CounterSetInfo updated)
+    {
+        _currentCatalog = new CounterCatalog
+        {
+            SourceHost = _currentCatalog.SourceHost,
+            IsStarter = _currentCatalog.IsStarter,
+            Warning = _currentCatalog.Warning,
+            Sets = _currentCatalog.Sets
+                .Select(set => set.Name.Equals(updated.Name, StringComparison.OrdinalIgnoreCase) ? updated : set)
+                .ToList()
+        };
+        var index = -1;
+        for (var i = 0; i < CatalogSets.Count; i++)
+        {
+            if (CatalogSets[i].Name.Equals(updated.Name, StringComparison.OrdinalIgnoreCase))
+            {
+                index = i;
+                break;
+            }
+        }
+
+        if (index >= 0)
+            CatalogSets[index] = updated;
+        SelectedSet = updated;
+        Dispatcher.CurrentDispatcher.BeginInvoke(new Action(() =>
+        {
+            var match = CatalogSets.FirstOrDefault(set => set.Name.Equals(updated.Name, StringComparison.OrdinalIgnoreCase));
+            if (match is not null && !ReferenceEquals(SelectedSet, match))
+                SelectedSet = match;
+        }));
     }
 
     private void RebuildCounters()
@@ -705,11 +815,13 @@ public partial class MainViewModel : ObservableObject
         foreach (var machine in _workspace.Machines)
         {
             Machines.Add(new MachineItemViewModel(
+                this,
                 machine.Id,
                 machine.Host,
                 machine.DisplayName,
                 machine.Credential.Mode == CredentialMode.Alternate,
-                machine.Credential.UserName));
+                machine.Credential.UserName,
+                machine.Connection));
         }
 
         SelectedMachine = Machines.FirstOrDefault(machine => machine.Id == selected) ?? Machines.FirstOrDefault();
@@ -748,6 +860,16 @@ public partial class MainViewModel : ObservableObject
             choices.Add(new Choice<int>(value, label));
     }
 
+    public void SetMachineConnection(string machineId, ConnectionMode connection)
+    {
+        var machine = _workspace.Machines.FirstOrDefault(item => item.Id == machineId);
+        if (machine is null || machine.Connection == connection)
+            return;
+        machine.Connection = connection;
+        if (SelectedMachine?.Id == machineId)
+            _ = ReloadCatalogAsync();
+    }
+
     private static string StatusLabel(MachineStatus status) => status switch
     {
         MachineStatus.Online => "Online",
@@ -770,13 +892,27 @@ public partial class MainViewModel : ObservableObject
 
 public partial class MachineItemViewModel : ObservableObject
 {
-    public MachineItemViewModel(string id, string host, string displayName, bool useAlternate, string? userName)
+    private readonly MainViewModel _owner;
+    private bool _suspend;
+
+    public MachineItemViewModel(MainViewModel owner, string id, string host, string displayName, bool useAlternate, string? userName, ConnectionMode connection)
     {
+        _owner = owner;
         Id = id;
         Host = host;
         DisplayName = displayName;
         UseAlternate = useAlternate;
         UserName = userName ?? "";
+        _suspend = true;
+        Connection = connection;
+        _suspend = false;
+    }
+
+    public void SetConnection(ConnectionMode connection)
+    {
+        _suspend = true;
+        Connection = connection;
+        _suspend = false;
     }
 
     public string Id { get; }
@@ -785,9 +921,16 @@ public partial class MachineItemViewModel : ObservableObject
     public bool UseAlternate { get; }
     public string UserName { get; }
     public string CredentialText => UseAlternate ? (string.IsNullOrWhiteSpace(UserName) ? "Other user" : UserName) : "Current user";
+    [ObservableProperty] private ConnectionMode connection;
     [ObservableProperty] private MachineStatus status = MachineStatus.Unknown;
     [ObservableProperty] private string statusText = "Idle";
     [ObservableProperty] private string detail = "";
+
+    partial void OnConnectionChanged(ConnectionMode value)
+    {
+        if (!_suspend)
+            _owner.SetMachineConnection(Id, value);
+    }
 }
 
 public partial class CounterRowViewModel : ObservableObject
@@ -860,6 +1003,7 @@ public partial class SeriesRowViewModel : ObservableObject
     [ObservableProperty] private string minimum = "—";
     [ObservableProperty] private string maximum = "—";
     [ObservableProperty] private string average = "—";
+    [ObservableProperty] private string duration = "—";
     [ObservableProperty] private double scale = 1;
 
     public void Apply(SeriesSnapshot snapshot)
@@ -875,6 +1019,7 @@ public partial class SeriesRowViewModel : ObservableObject
         Minimum = ValueFormat.Format(snapshot.Stats.Min);
         Maximum = ValueFormat.Format(snapshot.Stats.Max);
         Average = ValueFormat.Format(snapshot.Stats.Average);
+        Duration = ValueFormat.FormatDuration(snapshot.Stats.Duration);
         Scale = snapshot.Scale;
         _suspend = false;
     }

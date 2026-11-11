@@ -15,6 +15,19 @@ public enum CredentialMode
     Alternate
 }
 
+public enum ConnectionMode
+{
+    Pdh,
+    WinRm
+}
+
+public enum DisplayMode
+{
+    Line,
+    Bar,
+    Stats
+}
+
 public sealed class MachineCredential
 {
     public CredentialMode Mode { get; set; } = CredentialMode.Current;
@@ -27,6 +40,7 @@ public sealed class MachineTarget
     public string Host { get; set; } = ".";
     public string DisplayName { get; set; } = "Local";
     public MachineCredential Credential { get; set; } = new();
+    public ConnectionMode Connection { get; set; } = ConnectionMode.Pdh;
 }
 
 public sealed class CounterSelection
@@ -51,6 +65,8 @@ public sealed class Workspace
     public int VisibleWindowSeconds { get; set; } = 300;
     public bool FollowLive { get; set; } = true;
     public bool ShowLegend { get; set; } = true;
+    public DisplayMode DisplayMode { get; set; } = DisplayMode.Line;
+    public ConnectionMode DefaultConnection { get; set; } = ConnectionMode.Pdh;
     public List<MachineTarget> Machines { get; set; } = [];
     public List<CounterSelection> Counters { get; set; } = [];
     public Dictionary<string, string> ColorOverrides { get; set; } = new(StringComparer.OrdinalIgnoreCase);
