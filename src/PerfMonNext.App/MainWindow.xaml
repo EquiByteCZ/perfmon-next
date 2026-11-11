@@ -1,0 +1,247 @@
+<Window x:Class="PerfMonNext.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="clr-namespace:PerfMonNext.Views"
+        Title="{Binding WindowTitle}"
+        Width="1440" Height="920" MinWidth="1100" MinHeight="700"
+        Background="{StaticResource App.Background}">
+  <Window.InputBindings>
+    <KeyBinding Key="F5" Command="{Binding StartCommand}"/>
+    <KeyBinding Modifiers="Control" Key="S" Command="ApplicationCommands.Save"/>
+    <KeyBinding Modifiers="Control" Key="O" Command="ApplicationCommands.Open"/>
+  </Window.InputBindings>
+  <Window.CommandBindings>
+    <CommandBinding Command="ApplicationCommands.Open" Executed="OpenExecuted"/>
+    <CommandBinding Command="ApplicationCommands.Save" Executed="SaveExecuted"/>
+  </Window.CommandBindings>
+  <Grid Margin="12">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="28"/>
+    </Grid.RowDefinitions>
+
+    <DockPanel Grid.Row="0" Margin="0,0,0,10">
+      <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
+        <TextBlock Text="PerfMon Next" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center"/>
+        <TextBox Text="{Binding WorkspaceName, UpdateSourceTrigger=PropertyChanged}" Width="220" Margin="14,0,0,0"/>
+      </StackPanel>
+      <WrapPanel HorizontalAlignment="Right" VerticalAlignment="Center">
+        <Button Content="Open" Style="{StaticResource QuietButton}" Click="Open_Click"/>
+        <Button Content="Save" Style="{StaticResource QuietButton}" Click="Save_Click"/>
+        <Button Content="New" Style="{StaticResource QuietButton}" Command="{Binding NewWorkspaceCommand}"/>
+        <Button Content="Export CSV" Style="{StaticResource QuietButton}" Click="Export_Click"/>
+        <Button Content="Import" Style="{StaticResource QuietButton}" Click="Import_Click"/>
+      </WrapPanel>
+    </DockPanel>
+
+    <Border Grid.Row="1" Background="{StaticResource App.Surface}" BorderBrush="{StaticResource App.Border}" BorderThickness="1" CornerRadius="8" Padding="10,8" Margin="0,0,0,10">
+      <WrapPanel VerticalAlignment="Center">
+        <TextBlock Text="Every" Foreground="{StaticResource App.Muted}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+        <ComboBox Width="80" ItemsSource="{Binding IntervalChoices}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding SampleIntervalMs}" Margin="0,0,12,0"/>
+        <Button Content="Start" Style="{StaticResource PrimaryButton}" Command="{Binding StartCommand}" IsEnabled="{Binding IsSampling, Converter={StaticResource InverseBool}}"/>
+        <Button Content="Stop" Style="{StaticResource QuietButton}" Command="{Binding StopCommand}" IsEnabled="{Binding IsSampling}"/>
+        <TextBlock Text="Charts" Foreground="{StaticResource App.Muted}" VerticalAlignment="Center" Margin="8,0,6,0"/>
+        <ComboBox Width="130" ItemsSource="{Binding GroupingChoices}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding Grouping}" Margin="0,0,12,0"/>
+        <TextBlock Text="Window" Foreground="{StaticResource App.Muted}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+        <ComboBox Width="90" ItemsSource="{Binding WindowChoices}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding WindowSeconds}" Margin="0,0,12,0"/>
+        <CheckBox Content="Follow" IsChecked="{Binding FollowLive}" Margin="0,0,12,0" ToolTip="Keep the time axis on the latest samples. Turn off to pan and zoom."/>
+        <CheckBox Content="Legend" IsChecked="{Binding ShowLegend}" Margin="0,0,12,0"/>
+        <Button Content="Fit scales" Style="{StaticResource QuietButton}" Command="{Binding FitScalesCommand}" ToolTip="Pick a power-of-ten scale so each series sits near 10–100."/>
+      </WrapPanel>
+    </Border>
+
+    <Grid Grid.Row="2">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="390" MinWidth="320"/>
+        <ColumnDefinition Width="6"/>
+        <ColumnDefinition Width="*"/>
+      </Grid.ColumnDefinitions>
+      <Grid.RowDefinitions>
+        <RowDefinition Height="*"/>
+      </Grid.RowDefinitions>
+
+      <Border Grid.Column="0" Background="{StaticResource App.Surface}" BorderBrush="{StaticResource App.Border}" BorderThickness="1" CornerRadius="8" Padding="10">
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Top">
+            <DockPanel Margin="0,0,0,6">
+              <TextBlock Text="Machines" FontWeight="SemiBold" VerticalAlignment="Center"/>
+              <Button DockPanel.Dock="Right" Content="Add" Style="{StaticResource QuietButton}" Margin="0" Padding="10,4" Click="ToggleAddMachine"/>
+            </DockPanel>
+            <Border Background="{StaticResource App.Surface2}" CornerRadius="6" Padding="8" Margin="0,0,0,8"
+                    Visibility="{Binding IsAddMachineOpen, Converter={StaticResource BoolVis}}">
+              <StackPanel>
+                <TextBlock Text="Host (. for this computer)" Foreground="{StaticResource App.Muted}" FontSize="11"/>
+                <TextBox Text="{Binding NewHost, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,0" ToolTip="Host name. Use . for this computer."/>
+                <TextBlock Text="Display name" Foreground="{StaticResource App.Muted}" FontSize="11" Margin="0,6,0,0"/>
+                <TextBox Text="{Binding NewDisplayName, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,0"/>
+                <CheckBox Content="Different credentials" IsChecked="{Binding UseAlternateCredential}" Margin="0,6,0,0"/>
+                <TextBox Text="{Binding NewUserName, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,0" ToolTip="DOMAIN\user" Visibility="{Binding UseAlternateCredential, Converter={StaticResource BoolVis}}"/>
+                <PasswordBox x:Name="MachinePassword" Margin="0,6,0,0" ToolTip="Password is kept for this session, not in the workspace file." Visibility="{Binding UseAlternateCredential, Converter={StaticResource BoolVis}}"/>
+                <CheckBox Content="Remember on this PC" IsChecked="{Binding RememberCredential}" Margin="0,6,0,0" Visibility="{Binding UseAlternateCredential, Converter={StaticResource BoolVis}}"/>
+                <Button Content="Add machine" Style="{StaticResource PrimaryButton}" Margin="0,8,0,0" HorizontalAlignment="Left" Click="AddMachine_Click"/>
+              </StackPanel>
+            </Border>
+            <ListBox ItemsSource="{Binding Machines}" SelectedItem="{Binding SelectedMachine}" MaxHeight="160" Margin="0,0,0,6">
+              <ListBox.ItemTemplate>
+                <DataTemplate>
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="10"/>
+                      <ColumnDefinition Width="*"/>
+                      <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Ellipse Width="8" Height="8" Fill="{Binding Status, Converter={StaticResource StatusBrush}}" VerticalAlignment="Center"/>
+                    <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                      <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold"/>
+                      <TextBlock Text="{Binding Host}" Foreground="{StaticResource App.Muted}" FontSize="11"/>
+                    </StackPanel>
+                    <TextBlock Grid.Column="2" Text="{Binding StatusText}" Foreground="{StaticResource App.Muted}" FontSize="11" VerticalAlignment="Center"/>
+                  </Grid>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+            <TextBlock Text="{Binding SelectedMachine.Detail}" Foreground="{StaticResource App.Muted}" TextWrapping="Wrap" FontSize="11" MinHeight="16"/>
+            <StackPanel Orientation="Horizontal" Margin="0,6,0,8">
+              <Button Content="Test" Style="{StaticResource QuietButton}" Command="{Binding ProbeCommand}" Padding="10,4"/>
+              <Button Content="Remove" Style="{StaticResource QuietButton}" Command="{Binding RemoveMachineCommand}" Padding="10,4"/>
+              <TextBlock Text="{Binding SelectedMachine.CredentialText}" Foreground="{StaticResource App.Muted}" VerticalAlignment="Center" FontSize="11"/>
+            </StackPanel>
+            <Separator Background="{StaticResource App.Border}" Margin="0,0,0,8"/>
+            <DockPanel Margin="0,0,0,6">
+              <TextBlock Text="Counters" FontWeight="SemiBold" VerticalAlignment="Center"/>
+              <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Button Content="Reload" Style="{StaticResource QuietButton}" Command="{Binding ReloadCatalogCommand}" Padding="8,4" Margin="0"/>
+                <Button Content="Starter" Style="{StaticResource QuietButton}" Command="{Binding UseStarterCatalogCommand}" Padding="8,4" Margin="6,0,0,0"/>
+              </StackPanel>
+            </DockPanel>
+            <TextBlock Text="{Binding CatalogBanner}" Foreground="{StaticResource App.Muted}" TextWrapping="Wrap" FontSize="11" Margin="0,0,0,6"/>
+            <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" ToolTip="Filter counter sets, counters, instances, and help"/>
+            <DockPanel Margin="0,8,0,6">
+              <TextBlock Text="{Binding ScopeHint}" Foreground="{StaticResource App.Muted}" FontSize="11" TextWrapping="Wrap"/>
+            </DockPanel>
+            <CheckBox Content="Add to all machines" IsChecked="{Binding ScopeAllMachines}" Margin="0,0,0,6"/>
+          </StackPanel>
+
+          <Border DockPanel.Dock="Bottom" Background="{StaticResource App.Surface2}" CornerRadius="6" Padding="8" Margin="0,8,0,0" MaxHeight="120">
+            <TextBlock Text="{Binding HelpText}" TextWrapping="Wrap" FontSize="12"/>
+          </Border>
+
+          <Grid>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="*"/>
+              <RowDefinition Height="120"/>
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <DockPanel Grid.Row="0" Grid.Column="0" Margin="0,0,4,0">
+              <TextBlock DockPanel.Dock="Top" Text="Sets" Foreground="{StaticResource App.Muted}" FontSize="11" Margin="0,0,0,4"/>
+              <ListBox ItemsSource="{Binding CatalogSets}" SelectedItem="{Binding SelectedSet}" DisplayMemberPath="Name"/>
+            </DockPanel>
+            <DockPanel Grid.Row="0" Grid.Column="1" Margin="4,0,0,0">
+              <TextBlock DockPanel.Dock="Top" Text="Counters" Foreground="{StaticResource App.Muted}" FontSize="11" Margin="0,0,0,4"/>
+              <ListBox ItemsSource="{Binding Counters}" SelectedItem="{Binding SelectedCounter}">
+                <ListBox.ItemTemplate>
+                  <DataTemplate>
+                    <CheckBox Content="{Binding Name}" IsChecked="{Binding IsChecked, Mode=TwoWay}"/>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+            </DockPanel>
+            <DockPanel Grid.Row="1" Grid.ColumnSpan="2" Margin="0,6,0,0">
+              <TextBlock DockPanel.Dock="Top" Text="Instances" Foreground="{StaticResource App.Muted}" FontSize="11" Margin="0,0,0,4"/>
+              <ListBox ItemsSource="{Binding Instances}">
+                <ListBox.ItemTemplate>
+                  <DataTemplate>
+                    <CheckBox Content="{Binding Label}" IsChecked="{Binding IsChecked, Mode=TwoWay}"/>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+            </DockPanel>
+          </Grid>
+        </DockPanel>
+      </Border>
+
+      <GridSplitter Grid.Column="1" Width="6" HorizontalAlignment="Stretch"/>
+
+      <Grid Grid.Column="2">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="*"/>
+          <RowDefinition Height="6"/>
+          <RowDefinition Height="230" MinHeight="120"/>
+        </Grid.RowDefinitions>
+        <Border Grid.Row="0" Background="{StaticResource App.Surface}" BorderBrush="{StaticResource App.Border}" BorderThickness="1" CornerRadius="8">
+          <Grid>
+            <ScrollViewer x:Name="ChartScroll" VerticalScrollBarVisibility="Auto" SizeChanged="ChartScroll_SizeChanged" Padding="8">
+              <ItemsControl ItemsSource="{Binding Charts}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <Border Height="{Binding DataContext.ChartItemHeight, RelativeSource={RelativeSource AncestorType=Window}}" Margin="0,0,0,8" Background="#10161D" CornerRadius="6">
+                      <DockPanel>
+                        <TextBlock DockPanel.Dock="Top" Text="{Binding Title}" Margin="10,8,10,0" FontWeight="SemiBold"/>
+                        <views:LiveChartView Frame="{Binding Frame}" FollowLive="{Binding DataContext.FollowLive, RelativeSource={RelativeSource AncestorType=Window}, Mode=TwoWay}"/>
+                      </DockPanel>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+            <TextBlock Text="{Binding EmptyMessage}" Visibility="{Binding EmptyMessage, Converter={StaticResource StringVis}}"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{StaticResource App.Muted}" FontSize="14" TextWrapping="Wrap" MaxWidth="420" TextAlignment="Center"/>
+          </Grid>
+        </Border>
+        <GridSplitter Grid.Row="1" Height="6" HorizontalAlignment="Stretch"/>
+        <Border Grid.Row="2" Background="{StaticResource App.Surface}" BorderBrush="{StaticResource App.Border}" BorderThickness="1" CornerRadius="8" Padding="8">
+          <DockPanel>
+            <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+              <TextBlock Text="Series" FontWeight="SemiBold" VerticalAlignment="Center"/>
+              <TextBox DockPanel.Dock="Right" Width="280" Text="{Binding PathText, UpdateSourceTrigger=PropertyChanged}" ToolTip="Paste a counter path, for example \Processor(_Total)\% Processor Time"/>
+              <Button DockPanel.Dock="Right" Content="Add path" Style="{StaticResource QuietButton}" Command="{Binding AddPathCommand}" Padding="8,4"/>
+            </DockPanel>
+            <DataGrid ItemsSource="{Binding SeriesRows}">
+              <DataGrid.Columns>
+                <DataGridCheckBoxColumn Header="On" Binding="{Binding Visible, UpdateSourceTrigger=PropertyChanged}" Width="42"/>
+                <DataGridTemplateColumn Header="" Width="36">
+                  <DataGridTemplateColumn.CellTemplate>
+                    <DataTemplate>
+                      <Button Width="16" Height="16" Background="{Binding Color, Converter={StaticResource HexBrush}}" BorderThickness="0"
+                              Command="{Binding DataContext.CycleColorCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                              CommandParameter="{Binding OverrideKey}" ToolTip="Cycle color"/>
+                    </DataTemplate>
+                  </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTextColumn Header="Machine" Binding="{Binding Machine}" IsReadOnly="True" Width="120"/>
+                <DataGridTextColumn Header="Counter" Binding="{Binding Counter}" IsReadOnly="True" Width="*"/>
+                <DataGridTextColumn Header="Instance" Binding="{Binding Instance}" IsReadOnly="True" Width="120"/>
+                <DataGridTextColumn Header="Last" Binding="{Binding Last}" IsReadOnly="True" Width="80"/>
+                <DataGridTextColumn Header="Min" Binding="{Binding Minimum}" IsReadOnly="True" Width="80"/>
+                <DataGridTextColumn Header="Max" Binding="{Binding Maximum}" IsReadOnly="True" Width="80"/>
+                <DataGridTextColumn Header="Avg" Binding="{Binding Average}" IsReadOnly="True" Width="80"/>
+                <DataGridTextColumn Header="Scale" Binding="{Binding Scale, UpdateSourceTrigger=LostFocus, StringFormat=0.####}" Width="70"/>
+                <DataGridTemplateColumn Width="74">
+                  <DataGridTemplateColumn.CellTemplate>
+                    <DataTemplate>
+                      <Button Content="Remove" Style="{StaticResource QuietButton}" Margin="0" Padding="6,2"
+                              Command="{Binding DataContext.RemoveSeriesCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                              CommandParameter="{Binding Key}" ToolTip="Stop collecting the selection that produced this series."/>
+                    </DataTemplate>
+                  </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+              </DataGrid.Columns>
+            </DataGrid>
+          </DockPanel>
+        </Border>
+      </Grid>
+    </Grid>
+
+    <Border Grid.Row="3" Margin="0,8,0,0">
+      <DockPanel>
+        <TextBlock Text="{Binding Banner}" Foreground="#E6B450" TextTrimming="CharacterEllipsis"/>
+        <TextBlock DockPanel.Dock="Right" Text="{Binding StatusText}" Foreground="{StaticResource App.Muted}" Margin="12,0,0,0"/>
+      </DockPanel>
+    </Border>
+  </Grid>
+</Window>

@@ -1,0 +1,34 @@
+name: build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Test and cross-compile the Windows app
+        run: |
+          dotnet test -c Release
+          dotnet build src/PerfMonNext.App/PerfMonNext.App.csproj -c Release
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Test
+        run: dotnet test -c Release
+      - name: Publish
+        run: dotnet publish src/PerfMonNext.App/PerfMonNext.App.csproj -c Release -r win-x64 --self-contained false -o artifacts/win-x64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PerfMonNext-win-x64
+          path: artifacts/win-x64

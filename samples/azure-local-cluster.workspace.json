@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "name": "Azure Local cluster",
+  "sampleIntervalMs": 1000,
+  "historyCapacity": 1800,
+  "chartGrouping": "byCounter",
+  "visibleWindowSeconds": 300,
+  "followLive": true,
+  "showLegend": true,
+  "machines": [
+    { "id": "n1", "host": "node01", "displayName": "node01", "credential": { "mode": "current" } },
+    { "id": "n2", "host": "node02", "displayName": "node02", "credential": { "mode": "current" } },
+    { "id": "n3", "host": "node03", "displayName": "node03", "credential": { "mode": "alternate", "userName": "CONTOSO\\jaromir" } }
+  ],
+  "counters": [
+    { "id": "cpu", "machineId": "*", "category": "Processor", "counter": "% Processor Time", "instance": "_Total", "scale": 1, "enabled": true },
+    { "id": "mem", "machineId": "*", "category": "Memory", "counter": "Available MBytes", "instance": "", "scale": 1, "enabled": true },
+    { "id": "queue", "machineId": "*", "category": "System", "counter": "Processor Queue Length", "instance": "", "scale": 1, "enabled": true },
+    { "id": "hv", "machineId": "*", "category": "Hyper-V Hypervisor Logical Processor", "counter": "% Total Run Time", "instance": "_Total", "scale": 1, "enabled": true },
+    { "id": "csv", "machineId": "*", "category": "Cluster CSV File System", "counter": "IO Read Latency", "instance": "*", "scale": 1000, "enabled": true }
+  ]
+}

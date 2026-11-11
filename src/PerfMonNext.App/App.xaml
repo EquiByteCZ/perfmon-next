@@ -1,0 +1,18 @@
+<Application x:Class="PerfMonNext.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:conv="clr-namespace:PerfMonNext"
+             ShutdownMode="OnMainWindowClose">
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="Theme/Dark.xaml"/>
+      </ResourceDictionary.MergedDictionaries>
+      <conv:HexBrushConverter x:Key="HexBrush"/>
+      <conv:StatusBrushConverter x:Key="StatusBrush"/>
+      <conv:InverseBoolConverter x:Key="InverseBool"/>
+      <BooleanToVisibilityConverter x:Key="BoolVis"/>
+      <conv:StringVisConverter x:Key="StringVis"/>
+    </ResourceDictionary>
+  </Application.Resources>
+</Application>

@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>PerfMonNext.Core</RootNamespace>
+    <AssemblyName>PerfMonNext.Core</AssemblyName>
+    <Description>Workspace, sampling, and import/export logic for PerfMon Next.</Description>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+</Project>
