@@ -123,6 +123,7 @@ public sealed class SeriesSnapshot
     public required bool Visible { get; init; }
     public required IReadOnlyList<SamplePoint> Samples { get; init; }
     public required SeriesStats Stats { get; init; }
+    public string? LastError { get; init; }
 }
 
 public sealed class SeriesStore
@@ -134,6 +135,7 @@ public sealed class SeriesStore
         public required string DisplayName { get; set; }
         public required CounterPath Path { get; init; }
         public SampleRing Ring { get; } = new(1800);
+        public string? LastError { get; set; }
     }
 
     private readonly Dictionary<string, Tracked> _series = new(StringComparer.OrdinalIgnoreCase);
@@ -181,6 +183,10 @@ public sealed class SeriesStore
             tracked.Host = result.Host;
             tracked.DisplayName = result.DisplayName;
             tracked.Ring.EnsureCapacity(capacity);
+            if (reading.Quality == SampleQuality.Ok)
+                tracked.LastError = null;
+            else
+                tracked.LastError = string.IsNullOrWhiteSpace(reading.Error) ? result.Message ?? "No value." : reading.Error;
             double? value = reading.Quality == SampleQuality.Ok ? reading.Value : null;
             tracked.Ring.Append(new SamplePoint(result.Timestamp, value));
         }
@@ -278,7 +284,8 @@ public sealed class SeriesStore
                 Scale = scale,
                 Visible = visible,
                 Samples = samples,
-                Stats = SeriesStats.FromSamples(samples, scale)
+                Stats = SeriesStats.FromSamples(samples, scale),
+                LastError = tracked.LastError
             });
             paletteIndex++;
         }

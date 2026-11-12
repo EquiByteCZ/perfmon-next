@@ -135,14 +135,19 @@ public sealed class WindowsCounterReader : ICounterProbe
 
         private string[] GetInstances(string machine, string category)
         {
-            var cacheKey = machine + "\u001f" + category;
+            var cacheKey = machine + "" + category;
             if (_instances.TryGetValue(cacheKey, out var cached) && cached.Expires > DateTime.UtcNow)
                 return cached.Names;
 
-            var categoryRef = new PerformanceCounterCategory(category, machine);
-            string[] names = categoryRef.CategoryType == PerformanceCounterCategoryType.SingleInstance
-                ? []
-                : categoryRef.GetInstanceNames();
+            string[] names;
+            try
+            {
+                names = WindowsCategorySampler.ReadInstanceNames(machine, category);
+            }
+            catch
+            {
+                names = [];
+            }
             _instances[cacheKey] = (DateTime.UtcNow.AddSeconds(5), names);
             return names;
         }
@@ -151,6 +156,19 @@ public sealed class WindowsCounterReader : ICounterProbe
         {
             try
             {
+                if (string.IsNullOrEmpty(path.Instance))
+                {
+                    var instances = GetInstances(machine, path.Category);
+                    if (instances.Length > 0)
+                    {
+                        return new CounterReading(
+                            path,
+                            null,
+                            SampleQuality.Missing,
+                            "This counter is multi-instance and was added without an instance. Select _Total or another instance.");
+                    }
+                }
+
                 if (!_counters.TryGetValue(key, out var counter))
                 {
                     counter = new PerformanceCounter(path.Category, path.Counter, path.Instance ?? "", machine);

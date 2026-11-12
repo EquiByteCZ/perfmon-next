@@ -230,12 +230,14 @@ public static class WorkspaceEditor
         }
     }
 
-    public static string DefaultInstance(CounterSetInfo set)
+    public static string? DefaultInstance(CounterSetInfo set)
     {
         if (set.Instances.Any(i => i.Equals("_Total", StringComparison.OrdinalIgnoreCase)))
             return "_Total";
-        if (set.MultiInstance || set.Instances.Count > 0)
+        if (set.Instances.Count > 0)
             return "*";
+        if (set.MultiInstance)
+            return null;
         return "";
     }
 

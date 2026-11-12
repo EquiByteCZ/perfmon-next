@@ -62,12 +62,23 @@ public partial class LiveChartView : UserControl
             keep = plot.Axes.GetLimits();
 
         plot.Clear();
+        var tick = ScottPlot.Color.FromHex("#E8EEF5");
+        var muted = ScottPlot.Color.FromHex("#C5D0DC");
         plot.FigureBackground.Color = ScottPlot.Color.FromHex("#10161D");
         plot.DataBackground.Color = ScottPlot.Color.FromHex("#10161D");
-        plot.Axes.Color(ScottPlot.Color.FromHex("#8B9CB0"));
-        plot.Grid.MajorLineColor = ScottPlot.Color.FromHex("#243040");
+        plot.Axes.Color(tick);
+        plot.Axes.Bottom.TickLabelStyle.ForeColor = tick;
+        plot.Axes.Left.TickLabelStyle.ForeColor = tick;
+        plot.Axes.Bottom.TickLabelStyle.FontSize = 11;
+        plot.Axes.Left.TickLabelStyle.FontSize = 11;
+        plot.Axes.Bottom.MajorTickStyle.Color = muted;
+        plot.Axes.Left.MajorTickStyle.Color = muted;
+        plot.Axes.Bottom.MinorTickStyle.Color = ScottPlot.Color.FromHex("#3A4A5C");
+        plot.Axes.Left.MinorTickStyle.Color = ScottPlot.Color.FromHex("#3A4A5C");
+        plot.Grid.MajorLineColor = ScottPlot.Color.FromHex("#2A3646");
         plot.Legend.BackgroundColor = ScottPlot.Color.FromHex("#18212B");
-        plot.Legend.FontColor = ScottPlot.Color.FromHex("#E8EEF5");
+        plot.Legend.FontColor = tick;
+        plot.Legend.FontSize = 12;
         plot.Legend.OutlineColor = ScottPlot.Color.FromHex("#2A3646");
 
         foreach (var series in Frame.Series)
@@ -81,7 +92,14 @@ public partial class LiveChartView : UserControl
             scatter.LegendText = series.Legend;
         }
 
-        plot.Axes.DateTimeTicksBottom();
+        var bottom = plot.Axes.DateTimeTicksBottom();
+        if (bottom.TickGenerator is ScottPlot.TickGenerators.DateTimeAutomatic ticks)
+        {
+            ticks.LabelFormatter = value => value.ToString("HH:mm:ss");
+            ticks.MaxTickCount = 6;
+        }
+        plot.Axes.Bottom.TickLabelStyle.Rotation = 0;
+        plot.Axes.Bottom.MinimumSize = 28;
         if (Frame.ShowLegend)
             plot.ShowLegend(Alignment.UpperLeft);
 

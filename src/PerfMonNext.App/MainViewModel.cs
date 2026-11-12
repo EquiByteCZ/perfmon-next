@@ -97,6 +97,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private string statusText = "Stopped";
     [ObservableProperty] private string banner = "";
     [ObservableProperty] private string catalogBanner = "";
+    [ObservableProperty] private string instanceBanner = "";
     [ObservableProperty] private string emptyMessage = "";
     [ObservableProperty] private string searchText = "";
     [ObservableProperty] private string helpText = "Select a counter to read its explain text.";
@@ -241,6 +242,13 @@ public partial class MainViewModel : ObservableObject
 
     [RelayCommand]
     private void UseStarterCatalog() => ShowCatalog(StarterCatalog.Create());
+
+    [RelayCommand]
+    private async Task RetryInstancesAsync()
+    {
+        await ReloadCatalogAsync();
+    }
+
 
     [RelayCommand]
     private async Task ProbeAsync()
@@ -451,7 +459,17 @@ public partial class MainViewModel : ObservableObject
         if (!enabled)
             WorkspaceEditor.SetInstances(_workspace, CurrentScopeId, SelectedSet.Name, row.Name, []);
         else if (!WorkspaceEditor.HasCounter(_workspace, CurrentScopeId, SelectedSet.Name, row.Name))
-            WorkspaceEditor.SetInstances(_workspace, CurrentScopeId, SelectedSet.Name, row.Name, [WorkspaceEditor.DefaultInstance(SelectedSet)]);
+        {
+            var instance = WorkspaceEditor.DefaultInstance(SelectedSet);
+            if (instance is null)
+            {
+                Banner = SelectedSet.EnumerationError ?? CategoryEnumeration.MissingInstancesMessage;
+                RebuildInstances();
+                RefreshPresentation();
+                return;
+            }
+            WorkspaceEditor.SetInstances(_workspace, CurrentScopeId, SelectedSet.Name, row.Name, [instance]);
+        }
         RebuildInstances();
         RefreshPresentation();
     }
@@ -648,10 +666,11 @@ public partial class MainViewModel : ObservableObject
         Instances.Clear();
         if (SelectedSet is null || SelectedCounter is null)
         {
-            HelpText = SelectedSet?.Help ?? "Select a counter to read its explain text.";
+            InstanceBanner = "";
             return;
         }
 
+        InstanceBanner = SelectedSet.EnumerationError ?? "";
         var selected = WorkspaceEditor.InstancesFor(_workspace, CurrentScopeId, SelectedSet.Name, SelectedCounter.Name);
         if (SelectedSet.MultiInstance || SelectedSet.Instances.Count > 0)
             AddInstance("*", "*   every instance", selected);
@@ -661,6 +680,7 @@ public partial class MainViewModel : ObservableObject
             AddInstance(instance, instance, selected);
         _ = ShowHelpAsync(SelectedSet, SelectedCounter);
     }
+
 
     private void AddInstance(string name, string label, IReadOnlyList<string> selected)
     {
@@ -857,6 +877,7 @@ public partial class SeriesRowViewModel : ObservableObject
     [ObservableProperty] private string counter = "";
     [ObservableProperty] private string instance = "";
     [ObservableProperty] private string last = "—";
+    [ObservableProperty] private string rowTip = "";
     [ObservableProperty] private string minimum = "—";
     [ObservableProperty] private string maximum = "—";
     [ObservableProperty] private string average = "—";
@@ -871,11 +892,14 @@ public partial class SeriesRowViewModel : ObservableObject
         Machine = snapshot.MachineDisplay;
         Counter = snapshot.Path.Category + "\\" + snapshot.Path.Counter;
         Instance = string.IsNullOrEmpty(snapshot.Path.Instance) ? "—" : snapshot.Path.Instance;
-        Last = ValueFormat.Format(snapshot.Stats.Last);
+        Last = snapshot.Stats.Last is not null
+            ? ValueFormat.Format(snapshot.Stats.Last)
+            : (string.IsNullOrWhiteSpace(snapshot.LastError) ? "—" : snapshot.LastError);
         Minimum = ValueFormat.Format(snapshot.Stats.Min);
         Maximum = ValueFormat.Format(snapshot.Stats.Max);
         Average = ValueFormat.Format(snapshot.Stats.Average);
         Scale = snapshot.Scale;
+        RowTip = string.IsNullOrWhiteSpace(snapshot.LastError) ? "" : snapshot.LastError;
         _suspend = false;
     }
 

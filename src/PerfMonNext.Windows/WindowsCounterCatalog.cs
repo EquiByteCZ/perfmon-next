@@ -13,6 +13,7 @@ public sealed class WindowsCounterCatalog
     {
         IpcConnector.Ensure(machine, _vault);
         var pcMachine = MachineHost.ToCounterMachine(machine.Host);
+        WindowsCategorySampler.RefreshMachine(pcMachine);
         var categories = PerformanceCounterCategory.GetCategories(pcMachine);
         var sets = new List<CounterSetInfo>(categories.Length);
         var skipped = 0;
@@ -21,14 +22,22 @@ public sealed class WindowsCounterCatalog
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                // GetInstanceNames() on the instance returned by GetCategories(machine) is often
-                // empty for remote multi-instance sets (Hyper-V Hypervisor Logical Processor).
-                // Open a fresh category and read the sample instead.
-                var fresh = new PerformanceCounterCategory(category.CategoryName, pcMachine);
-                var built = CounterSetBuilder.Build(category.CategoryName, null, ReadRows(fresh));
+                var built = WindowsCategorySampler.ReadSet(pcMachine, category.CategoryName);
                 if (built.Counters.Count == 0)
-                    throw new InvalidOperationException("No counters.");
+                {
+                    skipped++;
+                    sets.Add(new CounterSetInfo
+                    {
+                        Name = category.CategoryName,
+                        MultiInstance = built.MultiInstance,
+                        Help = "This set is installed, but its counters could not be listed.",
+                        EnumerationError = built.EnumerationError ?? "No counters could be listed."
+                    });
+                    continue;
+                }
                 sets.Add(built);
+                if (built.EnumerationError is not null)
+                    skipped++;
             }
             catch
             {
@@ -37,7 +46,8 @@ public sealed class WindowsCounterCatalog
                 {
                     Name = category.CategoryName,
                     MultiInstance = true,
-                    Help = "This set is installed, but its counters could not be listed."
+                    Help = "This set is installed, but its counters could not be listed.",
+                    EnumerationError = "This set is installed, but its counters could not be listed."
                 });
             }
         }
@@ -45,7 +55,7 @@ public sealed class WindowsCounterCatalog
         return new CounterCatalog
         {
             SourceHost = machine.Host,
-            Warning = skipped == 0 ? null : skipped + " counter sets could not be listed (permissions or an empty instance list).",
+            Warning = skipped == 0 ? null : skipped + " counter sets could not be listed completely (permissions or an empty instance list).",
             Sets = sets
         };
     }
@@ -71,86 +81,8 @@ public sealed class WindowsCounterCatalog
 
         return "No explain text is available for " + category + "\\" + counter + ".";
     }
-
-    private static List<CounterSetBuilder.SampleRow> ReadRows(PerformanceCounterCategory category)
-    {
-        var rows = new List<CounterSetBuilder.SampleRow>();
-        try
-        {
-            foreach (InstanceDataCollection column in category.ReadCategory().Values)
-            {
-                if (column.Count == 0 && !string.IsNullOrWhiteSpace(column.CounterName))
-                {
-                    rows.Add(new CounterSetBuilder.SampleRow(column.CounterName, ""));
-                    continue;
-                }
-
-                foreach (InstanceData sample in column.Values)
-                    rows.Add(new CounterSetBuilder.SampleRow(column.CounterName, sample.InstanceName ?? ""));
-            }
-        }
-        catch
-        {
-            rows.Clear();
-        }
-
-        if (rows.Any(row => !string.IsNullOrWhiteSpace(row.Counter)))
-            return rows;
-
-        rows.AddRange(ReadWithCountersApi(category));
-        return rows;
-    }
-
-    private static List<CounterSetBuilder.SampleRow> ReadWithCountersApi(PerformanceCounterCategory category)
-    {
-        PerformanceCounter[]? counters = null;
-        try
-        {
-            if (category.CategoryType == PerformanceCounterCategoryType.SingleInstance)
-            {
-                counters = category.GetCounters();
-                return counters.Select(counter => new CounterSetBuilder.SampleRow(counter.CounterName, "")).ToList();
-            }
-
-            string[] instances;
-            try
-            {
-                instances = category.GetInstanceNames();
-            }
-            catch (InvalidOperationException)
-            {
-                instances = [];
-            }
-
-            if (instances.Length == 0)
-            {
-                try
-                {
-                    counters = category.GetCounters("_Total");
-                    return counters.Select(counter => new CounterSetBuilder.SampleRow(counter.CounterName, "_Total")).ToList();
-                }
-                catch
-                {
-                    counters = category.GetCounters();
-                    return counters.Select(counter => new CounterSetBuilder.SampleRow(counter.CounterName, "")).ToList();
-                }
-            }
-
-            var probe = instances.FirstOrDefault(name => name.Equals("_Total", StringComparison.OrdinalIgnoreCase)) ?? instances[0];
-            counters = category.GetCounters(probe);
-            var names = counters.Select(counter => counter.CounterName).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-            return names.SelectMany(name => instances.Select(instance => new CounterSetBuilder.SampleRow(name, instance))).ToList();
-        }
-        finally
-        {
-            if (counters is not null)
-            {
-                foreach (var counter in counters)
-                    counter.Dispose();
-            }
-        }
-    }
 }
+
 
 public sealed class DpapiSecretProtector : ISecretProtector
 {

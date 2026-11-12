@@ -13,6 +13,7 @@ public sealed class CounterSetInfo
     public bool MultiInstance { get; init; }
     public IReadOnlyList<string> Instances { get; init; } = [];
     public IReadOnlyList<CounterInfo> Counters { get; init; } = [];
+    public string? EnumerationError { get; init; }
 }
 
 public sealed class CounterCatalog
@@ -55,7 +56,8 @@ public static class CatalogSearch
                 Help = set.Help,
                 MultiInstance = set.MultiInstance,
                 Instances = set.Instances,
-                Counters = counters
+                Counters = counters,
+                EnumerationError = set.EnumerationError
             });
         }
 

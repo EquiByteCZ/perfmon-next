@@ -152,7 +152,15 @@
               </ListBox>
             </DockPanel>
             <DockPanel Grid.Row="1" Grid.ColumnSpan="2" Margin="0,6,0,0">
-              <TextBlock DockPanel.Dock="Top" Text="Instances" Foreground="{StaticResource App.Muted}" FontSize="11" Margin="0,0,0,4"/>
+              <DockPanel DockPanel.Dock="Top" Margin="0,0,0,4">
+                <TextBlock Text="Instances" Foreground="{StaticResource App.Muted}" FontSize="11" VerticalAlignment="Center"/>
+                <Button DockPanel.Dock="Right" Content="Retry" Style="{StaticResource QuietButton}" Padding="8,2" Margin="0"
+                        Command="{Binding RetryInstancesCommand}"
+                        Visibility="{Binding InstanceBanner, Converter={StaticResource StringVis}}"
+                        ToolTip="Reload this machine's catalog and try to list instances again."/>
+              </DockPanel>
+              <TextBlock DockPanel.Dock="Top" Text="{Binding InstanceBanner}" Foreground="#E6B450" TextWrapping="Wrap" FontSize="11" Margin="0,0,0,4"
+                         Visibility="{Binding InstanceBanner, Converter={StaticResource StringVis}}"/>
               <ListBox ItemsSource="{Binding Instances}">
                 <ListBox.ItemTemplate>
                   <DataTemplate>
@@ -202,6 +210,18 @@
               <Button DockPanel.Dock="Right" Content="Add path" Style="{StaticResource QuietButton}" Command="{Binding AddPathCommand}" Padding="8,4"/>
             </DockPanel>
             <DataGrid ItemsSource="{Binding SeriesRows}">
+              <DataGrid.RowStyle>
+                <Style TargetType="DataGridRow">
+                  <Setter Property="Background" Value="Transparent"/>
+                  <Setter Property="Foreground" Value="{StaticResource App.Text}"/>
+                  <Setter Property="ToolTip" Value="{Binding RowTip}"/>
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding RowTip}" Value="">
+                      <Setter Property="ToolTip" Value="{x:Null}"/>
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </DataGrid.RowStyle>
               <DataGrid.Columns>
                 <DataGridCheckBoxColumn Header="On" Binding="{Binding Visible, UpdateSourceTrigger=PropertyChanged}" Width="42"/>
                 <DataGridTemplateColumn Header="" Width="36">
