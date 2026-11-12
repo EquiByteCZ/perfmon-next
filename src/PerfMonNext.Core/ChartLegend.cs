@@ -72,7 +72,7 @@ public static class ChartLegend
 public static class ChartTicks
 {
     public const float FontSize = 14;
-    public const float BottomPad = 52;
+    public const float BottomPad = 56;
 
     public static int CountForWidth(double widthPx)
     {

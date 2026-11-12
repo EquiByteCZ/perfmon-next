@@ -114,7 +114,7 @@ public partial class LiveChartView : UserControl
 
         if (Frame.ShowLegend && Frame.LegendOverflow > 0)
         {
-            var marker = plot.Add.Scatter([double.NaN], [double.NaN]);
+            var marker = plot.Add.Scatter(new double[] { double.NaN }, new double[] { double.NaN });
             marker.LegendText = "+" + Frame.LegendOverflow + " more";
             marker.MarkerSize = 0;
             marker.LineWidth = 0;
@@ -128,7 +128,6 @@ public partial class LiveChartView : UserControl
             ticks.MaxTickCount = ChartTicks.CountForWidth(Plot.ActualWidth);
         }
         plot.Axes.Bottom.TickLabelStyle.Rotation = 0;
-        plot.Axes.Bottom.TickLabelStyle.PixelOffset = new PixelOffset(0, 4);
         plot.Axes.Bottom.MinimumSize = ChartTicks.BottomPad;
 
         if (Frame.ShowLegend)
