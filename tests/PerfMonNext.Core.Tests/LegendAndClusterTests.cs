@@ -1,3 +1,6 @@
+using PerfMonNext.Core;
+using Xunit;
+
 namespace PerfMonNext.Core.Tests;
 
 public sealed class LegendAndClusterTests
