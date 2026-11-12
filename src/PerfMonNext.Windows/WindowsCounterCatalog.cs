@@ -21,44 +21,14 @@ public sealed class WindowsCounterCatalog
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                var multi = category.CategoryType != PerformanceCounterCategoryType.SingleInstance;
-                string[] instances = [];
-                PerformanceCounter[] counters;
-                if (multi)
-                {
-                    instances = category.GetInstanceNames();
-                    Array.Sort(instances, (left, right) =>
-                    {
-                        var leftTotal = left.Equals("_Total", StringComparison.OrdinalIgnoreCase);
-                        var rightTotal = right.Equals("_Total", StringComparison.OrdinalIgnoreCase);
-                        if (leftTotal != rightTotal)
-                            return leftTotal ? -1 : 1;
-                        return string.Compare(left, right, StringComparison.OrdinalIgnoreCase);
-                    });
-                    counters = instances.Length == 0
-                        ? []
-                        : category.GetCounters(instances[0]);
-                }
-                else
-                {
-                    counters = category.GetCounters();
-                }
-
-                sets.Add(new CounterSetInfo
-                {
-                    Name = category.CategoryName,
-                    MultiInstance = multi,
-                    Instances = instances,
-                    Counters = counters
-                        .Select(counter => counter.CounterName)
-                        .Distinct(StringComparer.OrdinalIgnoreCase)
-                        .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
-                        .Select(name => new CounterInfo { Name = name })
-                        .ToList()
-                });
-
-                foreach (var counter in counters)
-                    counter.Dispose();
+                // GetInstanceNames() on the instance returned by GetCategories(machine) is often
+                // empty for remote multi-instance sets (Hyper-V Hypervisor Logical Processor).
+                // Open a fresh category and read the sample instead.
+                var fresh = new PerformanceCounterCategory(category.CategoryName, pcMachine);
+                var built = CounterSetBuilder.Build(category.CategoryName, null, ReadRows(fresh));
+                if (built.Counters.Count == 0)
+                    throw new InvalidOperationException("No counters.");
+                sets.Add(built);
             }
             catch
             {
@@ -100,6 +70,85 @@ public sealed class WindowsCounterCatalog
         }
 
         return "No explain text is available for " + category + "\\" + counter + ".";
+    }
+
+    private static List<CounterSetBuilder.SampleRow> ReadRows(PerformanceCounterCategory category)
+    {
+        var rows = new List<CounterSetBuilder.SampleRow>();
+        try
+        {
+            foreach (InstanceDataCollection column in category.ReadCategory().Values)
+            {
+                if (column.Count == 0 && !string.IsNullOrWhiteSpace(column.CounterName))
+                {
+                    rows.Add(new CounterSetBuilder.SampleRow(column.CounterName, ""));
+                    continue;
+                }
+
+                foreach (InstanceData sample in column.Values)
+                    rows.Add(new CounterSetBuilder.SampleRow(column.CounterName, sample.InstanceName ?? ""));
+            }
+        }
+        catch
+        {
+            rows.Clear();
+        }
+
+        if (rows.Any(row => !string.IsNullOrWhiteSpace(row.Counter)))
+            return rows;
+
+        rows.AddRange(ReadWithCountersApi(category));
+        return rows;
+    }
+
+    private static List<CounterSetBuilder.SampleRow> ReadWithCountersApi(PerformanceCounterCategory category)
+    {
+        PerformanceCounter[]? counters = null;
+        try
+        {
+            if (category.CategoryType == PerformanceCounterCategoryType.SingleInstance)
+            {
+                counters = category.GetCounters();
+                return counters.Select(counter => new CounterSetBuilder.SampleRow(counter.CounterName, "")).ToList();
+            }
+
+            string[] instances;
+            try
+            {
+                instances = category.GetInstanceNames();
+            }
+            catch (InvalidOperationException)
+            {
+                instances = [];
+            }
+
+            if (instances.Length == 0)
+            {
+                try
+                {
+                    counters = category.GetCounters("_Total");
+                    return counters.Select(counter => new CounterSetBuilder.SampleRow(counter.CounterName, "_Total")).ToList();
+                }
+                catch
+                {
+                    counters = category.GetCounters();
+                    return counters.Select(counter => new CounterSetBuilder.SampleRow(counter.CounterName, "")).ToList();
+                }
+            }
+
+            var probe = instances.FirstOrDefault(name => name.Equals("_Total", StringComparison.OrdinalIgnoreCase)) ?? instances[0];
+            counters = category.GetCounters(probe);
+            var names = counters.Select(counter => counter.CounterName).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            return names.SelectMany(name => instances.Select(instance => new CounterSetBuilder.SampleRow(name, instance))).ToList();
+        }
+        finally
+        {
+            if (counters is not null)
+            {
+                foreach (var counter in counters)
+                    counter.Dispose();
+            }
+        }
     }
 }
 

@@ -83,3 +83,48 @@ public static class CatalogSearch
         return true;
     }
 }
+
+/// <summary>
+/// Folds raw counter/instance rows into the picker model. Remote multi-instance sets
+/// often report no instances from <c>GetInstanceNames</c> on the objects returned by
+/// <c>GetCategories</c>, so the Windows catalog reads a fresh category with <c>ReadCategory</c>
+/// and passes those rows here.
+/// </summary>
+public static class CounterSetBuilder
+{
+    public readonly record struct SampleRow(string Counter, string Instance);
+
+    public static CounterSetInfo Build(string name, string? help, IReadOnlyList<SampleRow> rows)
+    {
+        var counters = new List<CounterInfo>();
+        var seenCounters = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var instances = new List<string>();
+        var seenInstances = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var row in rows)
+        {
+            if (!string.IsNullOrWhiteSpace(row.Counter) && seenCounters.Add(row.Counter.Trim()))
+                counters.Add(new CounterInfo { Name = row.Counter.Trim() });
+            if (!string.IsNullOrWhiteSpace(row.Instance) && row.Instance != "*" && seenInstances.Add(row.Instance.Trim()))
+                instances.Add(row.Instance.Trim());
+        }
+
+        counters.Sort((left, right) => string.Compare(left.Name, right.Name, StringComparison.OrdinalIgnoreCase));
+        instances.Sort((left, right) =>
+        {
+            var leftTotal = left.Equals("_Total", StringComparison.OrdinalIgnoreCase);
+            var rightTotal = right.Equals("_Total", StringComparison.OrdinalIgnoreCase);
+            if (leftTotal != rightTotal)
+                return leftTotal ? -1 : 1;
+            return string.Compare(left, right, StringComparison.OrdinalIgnoreCase);
+        });
+
+        return new CounterSetInfo
+        {
+            Name = name,
+            Help = help ?? "",
+            MultiInstance = instances.Count > 0,
+            Instances = instances,
+            Counters = counters
+        };
+    }
+}
