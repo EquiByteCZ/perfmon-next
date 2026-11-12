@@ -143,14 +143,14 @@
               <ListBox ItemsSource="{Binding CatalogSets}" SelectedItem="{Binding SelectedSet}" DisplayMemberPath="Name"/>
             </DockPanel>
             <DockPanel Grid.Row="0" Grid.Column="1" Margin="4,0,0,0">
-              <DockPanel DockPanel.Dock="Top" Margin="0,0,0,4">
-                <TextBlock Text="Counters" Foreground="{StaticResource App.Muted}" FontSize="11" VerticalAlignment="Center"/>
-                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+              <StackPanel DockPanel.Dock="Top" Margin="0,0,0,4">
+                <TextBlock Text="Counters" Foreground="{StaticResource App.Muted}" FontSize="11"/>
+                <StackPanel Orientation="Horizontal">
                   <Button Content="All" Style="{StaticResource LinkButton}" Command="{Binding SelectAllCountersCommand}" ToolTip="Tick every counter in this list. Shift-click a range, or press Ctrl+A."/>
                   <TextBlock Text=" / " Foreground="{StaticResource App.Muted}" VerticalAlignment="Center" FontSize="11"/>
                   <Button Content="None" Style="{StaticResource LinkButton}" Command="{Binding SelectNoCountersCommand}"/>
                 </StackPanel>
-              </DockPanel>
+              </StackPanel>
               <ListBox x:Name="CounterList" ItemsSource="{Binding Counters}" SelectedItem="{Binding SelectedCounter}"
                        PreviewMouseLeftButtonDown="CounterList_PreviewMouseLeftButtonDown"
                        KeyDown="CounterList_KeyDown">
