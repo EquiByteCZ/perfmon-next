@@ -35,11 +35,108 @@ jobs:
           -p:IncludeNativeLibrariesForSelfExtract=true
           -p:EnableCompressionInSingleFile=true
           -o artifacts/win-x64
-      - name: Zip
+      - name: Capture screenshots
+        if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          .github/scripts/capture-screenshots.ps1 -ExePath artifacts\win-x64\PerfMonNext.exe -OutputDir artifacts\screenshots
+      - name: Zip (unsigned CI build)
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
         shell: pwsh
         run: |
           Compress-Archive -Path artifacts/win-x64/* -DestinationPath artifacts/PerfMonNext-win-x64.zip -Force
       - uses: actions/upload-artifact@v4
         with:
+          name: PerfMonNext-win-x64-build
+          path: artifacts/win-x64
+      - uses: actions/upload-artifact@v4
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        with:
           name: PerfMonNext-win-x64
           path: artifacts/PerfMonNext-win-x64.zip
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+        with:
+          name: screenshots
+          path: artifacts/screenshots
+          if-no-files-found: warn
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [linux, windows]
+    runs-on: windows-latest
+    environment: release
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: PerfMonNext-win-x64-build
+          path: artifacts/win-x64
+      - name: Azure login
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Sign PerfMonNext.exe
+        uses: azure/artifact-signing-action@v2
+        with:
+          endpoint: https://eus.codesigning.azure.net/
+          signing-account-name: perfmonnextsigning
+          certificate-profile-name: perfmon-public
+          files-folder: ${{ github.workspace }}\artifacts\win-x64
+          files-folder-filter: exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+          exclude-environment-credential: true
+          exclude-workload-identity-credential: true
+          exclude-managed-identity-credential: true
+          exclude-shared-token-cache-credential: true
+          exclude-visual-studio-credential: true
+          exclude-visual-studio-code-credential: true
+          exclude-azure-cli-credential: false
+          exclude-azure-powershell-credential: true
+          exclude-azure-developer-cli-credential: true
+          exclude-interactive-browser-credential: true
+      - name: Verify signature
+        shell: pwsh
+        run: |
+          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1
+          if (-not $signtool) { throw "signtool.exe not found" }
+          Write-Host "Using $($signtool.FullName)"
+          & $signtool.FullName verify /pa /v artifacts\win-x64\PerfMonNext.exe
+          if ($LASTEXITCODE -ne 0) { throw "Signature verification failed with exit code $LASTEXITCODE" }
+      - name: Zip signed build
+        shell: pwsh
+        run: |
+          Compress-Archive -Path artifacts/win-x64/* -DestinationPath artifacts/PerfMonNext-win-x64.zip -Force
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PerfMonNext-win-x64-signed
+          path: artifacts/PerfMonNext-win-x64.zip
+      - name: Publish release to EquiByteCZ/perfmon-next-releases
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:GH_TOKEN)) {
+            Write-Error "RELEASES_GITHUB_TOKEN is not set. Create a fine-grained PAT (resource owner EquiByteCZ, repository perfmon-next-releases, Contents: Read and write) and add it as that secret on EquiByteCZ/perfmon-next. The signed ZIP was still uploaded as the PerfMonNext-win-x64-signed artifact."
+            exit 1
+          }
+          $tag = $env:GITHUB_REF_NAME
+          $notes = @"
+          PerfMon Next $tag, signed by EquiByte s.r.o. with Azure Artifact Signing.
+
+          Download ``PerfMonNext-win-x64.zip``, unzip, and run ``PerfMonNext.exe``. Windows may show SmartScreen on the first run until the publisher builds reputation; the signer is EquiByte s.r.o.
+
+          Documentation: https://github.com/EquiByteCZ/perfmon-next-releases
+          "@
+          gh release create $tag artifacts/PerfMonNext-win-x64.zip `
+            --repo EquiByteCZ/perfmon-next-releases `
+            --title "PerfMon Next $tag" `
+            --notes $notes

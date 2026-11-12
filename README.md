@@ -4,6 +4,15 @@ A Windows desktop replacement for Performance Monitor, aimed at watching the sam
 
 The window is dark. The left side is the machine list and a searchable counter picker. The right side is live ScottPlot charts (combined, one chart per counter, or one chart per machine) and a table of last / min / max / average. Sampling, workspaces, CSV, and `.blg` import are described below.
 
+## Downloads
+
+Signed Windows builds are published in the public **[PerfMon Next releases](https://github.com/EquiByteCZ/perfmon-next-releases/releases)** repository (this source repository stays private). Download `PerfMonNext-win-x64.zip`, unzip, and run `PerfMonNext.exe`.
+
+The executable is signed by **EquiByte s.r.o.** with Azure Artifact Signing (public trust). Windows SmartScreen may still warn on the first run until the publisher builds reputation; the dialog should show EquiByte s.r.o. as the signer.
+
+A user guide and screenshots live in the [public documentation](https://github.com/EquiByteCZ/perfmon-next-releases).
+
+
 ## Why this stack
 
 .NET 8 and WPF. WinUI 3 pulls in the Windows App SDK, which does not cross-compile cleanly, and WPF's virtualized lists and data grid fit a dense operator tool. Charts use ScottPlot 5 (Skia) because it stays responsive with long histories and many series. Counters use `System.Diagnostics.PerformanceCounter`, the supported managed wrapper over PDH, including remote machines. Alternate credentials open `\\host\IPC$` with `WNetAddConnection2`, because remote PDH uses that session. Binary `.blg` logs are converted with `relog.exe` (the supported tool) and then imported as PDH-CSV.
@@ -60,7 +69,7 @@ Run from source on Windows:
 dotnet run --project src\PerfMonNext.App -c Release
 ```
 
-GitHub Actions (`.github/workflows/build.yml`) runs the tests, cross-compiles on Ubuntu, and uploads a win-x64 publish from the Windows runner.
+GitHub Actions (`.github/workflows/build.yml`) runs the tests, cross-compiles on Ubuntu, publishes a self-contained win-x64 build from the Windows runner, and on version tags signs `PerfMonNext.exe` and publishes the ZIP to the public releases repository.
 
 ## Using it
 
