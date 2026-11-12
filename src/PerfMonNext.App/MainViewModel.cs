@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Windows;
 using System.IO;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -79,11 +80,12 @@ public partial class MainViewModel : ObservableObject
     [
         new(60, "1 min"), new(300, "5 min"), new(900, "15 min"), new(3600, "1 hour"), new(0, "All")
     ];
-    public IReadOnlyList<Choice<ChartGrouping>> GroupingChoices { get; } =
+    public IReadOnlyList<Choice<string>> ChartModeChoices { get; } =
     [
-        new(ChartGrouping.ByCounter, "By counter"),
-        new(ChartGrouping.ByMachine, "By machine"),
-        new(ChartGrouping.Combined, "Combined")
+        new("ByCounter", "By counter"),
+        new("ByMachine", "By machine"),
+        new("Combined", "Combined"),
+        new("off", "Table only")
     ];
 
     [ObservableProperty] private string workspaceName = "Local overview";
@@ -91,8 +93,10 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private int sampleIntervalMs = 1000;
     [ObservableProperty] private int windowSeconds = 300;
     [ObservableProperty] private ChartGrouping grouping = ChartGrouping.ByCounter;
+    [ObservableProperty] private string chartMode = "ByCounter";
     [ObservableProperty] private bool followLive = true;
     [ObservableProperty] private bool showLegend = true;
+    [ObservableProperty] private bool chartsVisible = true;
     [ObservableProperty] private bool isSampling;
     [ObservableProperty] private bool isOffline;
     [ObservableProperty] private bool isAddMachineOpen;
@@ -117,6 +121,9 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private CounterRowViewModel? selectedCounter;
 
     public double ChartItemHeight => Charts.Count <= 1 ? Math.Max(220, _chartViewportHeight) : 260;
+    public GridLength ChartRowHeight => ChartsVisible ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+    public GridLength SplitterRowHeight => ChartsVisible ? new GridLength(6) : new GridLength(0);
+    public GridLength TableRowHeight => ChartsVisible ? new GridLength(230) : new GridLength(1, GridUnitType.Star);
     public string CurrentScopeId => ScopeAllMachines || SelectedMachine is null ? "*" : SelectedMachine.Id;
     public string ScopeHint => ScopeAllMachines
         ? "A tick adds the counter on every machine."
@@ -154,6 +161,47 @@ public partial class MainViewModel : ObservableObject
         _workspace.ChartGrouping = value;
         RefreshPresentation();
     }
+
+    partial void OnChartModeChanged(string value)
+    {
+        if (value == "off")
+        {
+            _workspace.ChartsEnabled = false;
+            ChartsVisible = false;
+            NotifyChartLayout();
+            RefreshPresentation();
+            return;
+        }
+
+        _workspace.ChartsEnabled = true;
+        ChartsVisible = true;
+        Grouping = value switch
+        {
+            "ByMachine" => ChartGrouping.ByMachine,
+            "Combined" => ChartGrouping.Combined,
+            _ => ChartGrouping.ByCounter
+        };
+        NotifyChartLayout();
+        RefreshPresentation();
+    }
+
+    private void NotifyChartLayout()
+    {
+        OnPropertyChanged(nameof(ChartRowHeight));
+        OnPropertyChanged(nameof(SplitterRowHeight));
+        OnPropertyChanged(nameof(TableRowHeight));
+        OnPropertyChanged(nameof(ChartItemHeight));
+    }
+
+    private static string ChartModeFor(ChartGrouping grouping, bool chartsEnabled) =>
+        chartsEnabled
+            ? grouping switch
+            {
+                ChartGrouping.ByMachine => "ByMachine",
+                ChartGrouping.Combined => "Combined",
+                _ => "ByCounter"
+            }
+            : "off";
 
     partial void OnFollowLiveChanged(bool value) => _workspace.FollowLive = value;
     partial void OnShowLegendChanged(bool value)
@@ -662,11 +710,20 @@ public partial class MainViewModel : ObservableObject
     {
         _last = _store.Snapshot(_workspace, _workspace.VisibleWindow).ToList();
         SyncRows(_last);
-        var frames = ChartFrames.Build(_last, _workspace.ChartGrouping, _workspace.ShowLegend, _workspace.VisibleWindow);
-        SyncCharts(frames);
-        EmptyMessage = frames.Count == 0
-            ? (IsSampling ? "Waiting for a completed sample. Rate counters appear on the second read." : "Tick counters on the left, then press Start.")
-            : "";
+        if (!_workspace.ChartsEnabled)
+        {
+            if (Charts.Count > 0)
+                Charts.Clear();
+            EmptyMessage = "";
+        }
+        else
+        {
+            var frames = ChartFrames.Build(_last, _workspace.ChartGrouping, _workspace.ShowLegend, _workspace.VisibleWindow);
+            SyncCharts(frames);
+            EmptyMessage = frames.Count == 0
+                ? (IsSampling ? "Waiting for a completed sample. Rate counters appear on the second read." : "Tick counters on the left, then press Start.")
+                : "";
+        }
         var online = Machines.Count(machine => machine.Status == MachineStatus.Online);
         var bad = Machines.Count(machine => machine.Status is MachineStatus.Offline or MachineStatus.AccessDenied or MachineStatus.Error);
         StatusText = (IsSampling ? "Sampling" : IsOffline ? "Offline data" : "Stopped")
@@ -735,8 +792,11 @@ public partial class MainViewModel : ObservableObject
         SampleIntervalMs = _workspace.SampleIntervalMs;
         WindowSeconds = _workspace.VisibleWindowSeconds;
         Grouping = _workspace.ChartGrouping;
+        ChartsVisible = _workspace.ChartsEnabled;
+        ChartMode = ChartModeFor(_workspace.ChartGrouping, _workspace.ChartsEnabled);
         FollowLive = _workspace.FollowLive;
         ShowLegend = _workspace.ShowLegend;
+        NotifyChartLayout();
         EnsureChoice(IntervalChoices, SampleIntervalMs, SampleIntervalMs + " ms");
         EnsureChoice(WindowChoices, WindowSeconds, WindowSeconds + " s");
         BindMachines();

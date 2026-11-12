@@ -76,6 +76,21 @@ public sealed class WorkspaceTests
     }
 
     [Fact]
+    public void Missing_showCharts_defaults_to_on_and_table_only_roundtrips()
+    {
+        var legacy = WorkspaceStore.Deserialize("""{"version": 1, "name": "Legacy", "machines": [{"id": "local", "host": ".", "displayName": "Local"}]}""").Workspace;
+        Assert.True(legacy.ChartsEnabled);
+        Assert.Null(legacy.ShowCharts);
+
+        var workspace = WorkspaceFactory.CreateNew();
+        workspace.ChartsEnabled = false;
+        var json = WorkspaceStore.Serialize(workspace);
+        Assert.Contains("\"showCharts\": false", json, StringComparison.Ordinal);
+        var loaded = WorkspaceStore.Deserialize(json).Workspace;
+        Assert.False(loaded.ChartsEnabled);
+    }
+
+    [Fact]
     public void Password_in_json_is_ignored()
     {
         const string json = """

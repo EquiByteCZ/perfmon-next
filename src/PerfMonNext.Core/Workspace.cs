@@ -51,6 +51,15 @@ public sealed class Workspace
     public int VisibleWindowSeconds { get; set; } = 300;
     public bool FollowLive { get; set; } = true;
     public bool ShowLegend { get; set; } = true;
+    /// <summary>Null means "on" so workspaces saved before this field still show charts.</summary>
+    public bool? ShowCharts { get; set; }
+
+    [JsonIgnore]
+    public bool ChartsEnabled
+    {
+        get => ShowCharts ?? true;
+        set => ShowCharts = value;
+    }
     public List<MachineTarget> Machines { get; set; } = [];
     public List<CounterSelection> Counters { get; set; } = [];
     public Dictionary<string, string> ColorOverrides { get; set; } = new(StringComparer.OrdinalIgnoreCase);

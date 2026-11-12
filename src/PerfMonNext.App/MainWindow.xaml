@@ -43,7 +43,7 @@
         <Button Content="Start" Style="{StaticResource PrimaryButton}" Command="{Binding StartCommand}" IsEnabled="{Binding IsSampling, Converter={StaticResource InverseBool}}"/>
         <Button Content="Stop" Style="{StaticResource QuietButton}" Command="{Binding StopCommand}" IsEnabled="{Binding IsSampling}"/>
         <TextBlock Text="Charts" Foreground="{StaticResource App.Muted}" VerticalAlignment="Center" Margin="8,0,6,0"/>
-        <ComboBox Width="130" ItemsSource="{Binding GroupingChoices}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding Grouping}" Margin="0,0,12,0"/>
+        <ComboBox Width="130" ItemsSource="{Binding ChartModeChoices}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding ChartMode}" Margin="0,0,12,0" ToolTip="How to group live charts, or Table only to hide them and keep the series report."/>
         <TextBlock Text="Window" Foreground="{StaticResource App.Muted}" VerticalAlignment="Center" Margin="0,0,6,0"/>
         <ComboBox Width="90" ItemsSource="{Binding WindowChoices}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding WindowSeconds}" Margin="0,0,12,0"/>
         <CheckBox Content="Follow" IsChecked="{Binding FollowLive}" Margin="0,0,12,0" ToolTip="Keep the time axis on the latest samples. Turn off to pan and zoom."/>
@@ -198,11 +198,12 @@
 
       <Grid Grid.Column="2">
         <Grid.RowDefinitions>
-          <RowDefinition Height="*"/>
-          <RowDefinition Height="6"/>
-          <RowDefinition Height="230" MinHeight="120"/>
+          <RowDefinition Height="{Binding ChartRowHeight}"/>
+          <RowDefinition Height="{Binding SplitterRowHeight}"/>
+          <RowDefinition Height="{Binding TableRowHeight}" MinHeight="120"/>
         </Grid.RowDefinitions>
-        <Border Grid.Row="0" Background="{StaticResource App.Surface}" BorderBrush="{StaticResource App.Border}" BorderThickness="1" CornerRadius="8">
+        <Border Grid.Row="0" Background="{StaticResource App.Surface}" BorderBrush="{StaticResource App.Border}" BorderThickness="1" CornerRadius="8"
+                Visibility="{Binding ChartsVisible, Converter={StaticResource BoolVis}}">
           <Grid>
             <ScrollViewer x:Name="ChartScroll" VerticalScrollBarVisibility="Auto" SizeChanged="ChartScroll_SizeChanged" Padding="8">
               <ItemsControl ItemsSource="{Binding Charts}">
@@ -222,7 +223,8 @@
                        HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{StaticResource App.Muted}" FontSize="14" TextWrapping="Wrap" MaxWidth="420" TextAlignment="Center"/>
           </Grid>
         </Border>
-        <GridSplitter Grid.Row="1" Height="6" HorizontalAlignment="Stretch"/>
+        <GridSplitter Grid.Row="1" Height="6" HorizontalAlignment="Stretch"
+                      Visibility="{Binding ChartsVisible, Converter={StaticResource BoolVis}}"/>
         <Border Grid.Row="2" Background="{StaticResource App.Surface}" BorderBrush="{StaticResource App.Border}" BorderThickness="1" CornerRadius="8" Padding="8">
           <DockPanel>
             <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
