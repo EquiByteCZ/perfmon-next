@@ -47,8 +47,9 @@
         <TextBlock Text="Window" Foreground="{StaticResource App.Muted}" VerticalAlignment="Center" Margin="0,0,6,0"/>
         <ComboBox Width="90" ItemsSource="{Binding WindowChoices}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding WindowSeconds}" Margin="0,0,12,0"/>
         <CheckBox Content="Follow" IsChecked="{Binding FollowLive}" Margin="0,0,12,0" ToolTip="Keep the time axis on the latest samples. Turn off to pan and zoom."/>
-        <CheckBox Content="Legend" IsChecked="{Binding ShowLegend}" Margin="0,0,12,0"/>
+        <CheckBox Content="Legend" IsChecked="{Binding ShowLegend}" Margin="0,0,12,0" ToolTip="Show a compact chart legend. Uncheck to hide it on every chart; series table colors stay visible."/>
         <Button Content="Fit scales" Style="{StaticResource QuietButton}" Command="{Binding FitScalesCommand}" ToolTip="Pick a power-of-ten scale so each series sits near 10–100."/>
+        <Button Content="Reset" Style="{StaticResource QuietButton}" Command="{Binding ResetViewCommand}" ToolTip="Reset zoom and pan on every chart and turn Follow back on."/>
       </WrapPanel>
     </Border>
 
@@ -131,7 +132,7 @@
           <Grid>
             <Grid.RowDefinitions>
               <RowDefinition Height="*"/>
-              <RowDefinition Height="120"/>
+              <RowDefinition Height="150"/>
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="*"/>
@@ -142,8 +143,17 @@
               <ListBox ItemsSource="{Binding CatalogSets}" SelectedItem="{Binding SelectedSet}" DisplayMemberPath="Name"/>
             </DockPanel>
             <DockPanel Grid.Row="0" Grid.Column="1" Margin="4,0,0,0">
-              <TextBlock DockPanel.Dock="Top" Text="Counters" Foreground="{StaticResource App.Muted}" FontSize="11" Margin="0,0,0,4"/>
-              <ListBox ItemsSource="{Binding Counters}" SelectedItem="{Binding SelectedCounter}">
+              <DockPanel DockPanel.Dock="Top" Margin="0,0,0,4">
+                <TextBlock Text="Counters" Foreground="{StaticResource App.Muted}" FontSize="11" VerticalAlignment="Center"/>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                  <Button Content="Select all" Style="{StaticResource LinkButton}" Command="{Binding SelectAllCountersCommand}" ToolTip="Tick every counter in this list. Shift-click a range, or press Ctrl+A."/>
+                  <TextBlock Text=" / " Foreground="{StaticResource App.Muted}" VerticalAlignment="Center" FontSize="11"/>
+                  <Button Content="None" Style="{StaticResource LinkButton}" Command="{Binding SelectNoCountersCommand}"/>
+                </StackPanel>
+              </DockPanel>
+              <ListBox x:Name="CounterList" ItemsSource="{Binding Counters}" SelectedItem="{Binding SelectedCounter}"
+                       PreviewMouseLeftButtonDown="CounterList_PreviewMouseLeftButtonDown"
+                       KeyDown="CounterList_KeyDown">
                 <ListBox.ItemTemplate>
                   <DataTemplate>
                     <CheckBox Content="{Binding Name}" IsChecked="{Binding IsChecked, Mode=TwoWay}"/>
@@ -154,14 +164,25 @@
             <DockPanel Grid.Row="1" Grid.ColumnSpan="2" Margin="0,6,0,0">
               <DockPanel DockPanel.Dock="Top" Margin="0,0,0,4">
                 <TextBlock Text="Instances" Foreground="{StaticResource App.Muted}" FontSize="11" VerticalAlignment="Center"/>
-                <Button DockPanel.Dock="Right" Content="Retry" Style="{StaticResource QuietButton}" Padding="8,2" Margin="0"
+                <Button DockPanel.Dock="Right" Content="Retry" Style="{StaticResource QuietButton}" Padding="8,2" Margin="6,0,0,0"
                         Command="{Binding RetryInstancesCommand}"
                         Visibility="{Binding InstanceBanner, Converter={StaticResource StringVis}}"
                         ToolTip="Reload this machine's catalog and try to list instances again."/>
               </DockPanel>
               <TextBlock DockPanel.Dock="Top" Text="{Binding InstanceBanner}" Foreground="#E6B450" TextWrapping="Wrap" FontSize="11" Margin="0,0,0,4"
                          Visibility="{Binding InstanceBanner, Converter={StaticResource StringVis}}"/>
-              <ListBox ItemsSource="{Binding Instances}">
+              <DockPanel DockPanel.Dock="Top" Margin="0,0,0,4">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0,0,0">
+                  <Button Content="Select all" Style="{StaticResource LinkButton}" Command="{Binding SelectAllInstancesCommand}" ToolTip="Tick every instance shown below. Type a filter first to tick only the matches."/>
+                  <TextBlock Text=" / " Foreground="{StaticResource App.Muted}" VerticalAlignment="Center" FontSize="11"/>
+                  <Button Content="None" Style="{StaticResource LinkButton}" Command="{Binding SelectNoInstancesCommand}"/>
+                </StackPanel>
+                <TextBox Text="{Binding InstanceFilter, UpdateSourceTrigger=PropertyChanged}" Padding="6,3"
+                         ToolTip="Filter instances, for example Hv VP or a VM name, then Select all."/>
+              </DockPanel>
+              <ListBox x:Name="InstanceList" ItemsSource="{Binding Instances}"
+                       PreviewMouseLeftButtonDown="InstanceList_PreviewMouseLeftButtonDown"
+                       KeyDown="InstanceList_KeyDown">
                 <ListBox.ItemTemplate>
                   <DataTemplate>
                     <CheckBox Content="{Binding Label}" IsChecked="{Binding IsChecked, Mode=TwoWay}"/>
@@ -206,10 +227,13 @@
           <DockPanel>
             <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
               <TextBlock Text="Series" FontWeight="SemiBold" VerticalAlignment="Center"/>
-              <TextBox DockPanel.Dock="Right" Width="280" Text="{Binding PathText, UpdateSourceTrigger=PropertyChanged}" ToolTip="Paste a counter path, for example \Processor(_Total)\% Processor Time"/>
+              <TextBox DockPanel.Dock="Right" Width="240" Text="{Binding PathText, UpdateSourceTrigger=PropertyChanged}" ToolTip="Paste a counter path, for example \Processor(_Total)\% Processor Time"/>
               <Button DockPanel.Dock="Right" Content="Add path" Style="{StaticResource QuietButton}" Command="{Binding AddPathCommand}" Padding="8,4"/>
+              <Button DockPanel.Dock="Right" Content="Remove selected" Style="{StaticResource QuietButton}" Padding="8,4" Margin="0,0,8,0"
+                      Click="RemoveSelectedSeries_Click" ToolTip="Remove the selected series rows. Shift- or Ctrl-click to select many, then press Delete."/>
             </DockPanel>
-            <DataGrid ItemsSource="{Binding SeriesRows}">
+            <DataGrid x:Name="SeriesGrid" ItemsSource="{Binding SeriesRows}" SelectionMode="Extended" SelectionUnit="FullRow"
+                      KeyDown="SeriesGrid_KeyDown">
               <DataGrid.RowStyle>
                 <Style TargetType="DataGridRow">
                   <Setter Property="Background" Value="Transparent"/>

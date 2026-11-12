@@ -7,6 +7,15 @@ public sealed class EncodedSeries
     public required string Color { get; init; }
     public required double[] Xs { get; init; }
     public required double[] Ys { get; init; }
+
+    public EncodedSeries WithoutLegend() => new()
+    {
+        Key = Key,
+        Legend = "",
+        Color = Color,
+        Xs = Xs,
+        Ys = Ys
+    };
 }
 
 public sealed class ChartFrame
@@ -14,6 +23,7 @@ public sealed class ChartFrame
     public required string Key { get; init; }
     public required string Title { get; init; }
     public required bool ShowLegend { get; init; }
+    public int LegendOverflow { get; init; }
     public double? XMin { get; init; }
     public double? XMax { get; init; }
     public double? YMin { get; init; }
@@ -59,7 +69,21 @@ public static class ChartFrames
         var frames = new List<ChartFrame>();
         foreach (var group in groups.OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase))
         {
-            var encoded = group.Select(item => Encode(item, grouping)).Where(item => item.Xs.Length > 0).ToList();
+            var candidates = group.ToList();
+            var labels = ChartLegend.Labels(candidates, grouping);
+            var encoded = new List<EncodedSeries>();
+            for (var i = 0; i < candidates.Count; i++)
+            {
+                var item = Encode(candidates[i], labels[i]);
+                if (item.Xs.Length > 0)
+                    encoded.Add(item);
+            }
+
+            for (var i = 0; i < encoded.Count; i++)
+            {
+                if (!ChartLegend.IncludeInLegend(i, encoded.Count, showLegend))
+                    encoded[i] = encoded[i].WithoutLegend();
+            }
             double? xMin = null, xMax = null, yMin = null, yMax = null;
             foreach (var item in encoded)
             {
@@ -115,7 +139,8 @@ public static class ChartFrames
             {
                 Key = keyPrefix + ":" + group.Key,
                 Title = group.Key,
-                ShowLegend = showLegend && encoded.Count is > 0 and <= 12,
+                ShowLegend = ChartLegend.ShouldShow(showLegend, encoded.Count),
+                LegendOverflow = ChartLegend.Overflow(encoded.Count, showLegend),
                 XMin = xMin,
                 XMax = xMax,
                 YMin = yMin,
@@ -127,7 +152,7 @@ public static class ChartFrames
         return frames;
     }
 
-    public static EncodedSeries Encode(SeriesSnapshot snapshot, ChartGrouping grouping)
+    public static EncodedSeries Encode(SeriesSnapshot snapshot, string legend)
     {
         var xs = new double[snapshot.Samples.Count];
         var ys = new double[snapshot.Samples.Count];
@@ -141,28 +166,16 @@ public static class ChartFrames
         return new EncodedSeries
         {
             Key = snapshot.Key,
-            Legend = Legend(snapshot, grouping),
+            Legend = legend,
             Color = snapshot.Color,
             Xs = xs,
             Ys = ys
         };
     }
 
-    public static string Legend(SeriesSnapshot snapshot, ChartGrouping grouping)
-    {
-        var instance = snapshot.Path.Instance;
-        var hasInstance = !string.IsNullOrEmpty(instance);
-        return grouping switch
-        {
-            ChartGrouping.ByMachine => hasInstance
-                ? snapshot.Path.Counter + " (" + instance + ")"
-                : snapshot.Path.Category + "\\" + snapshot.Path.Counter,
-            ChartGrouping.ByCounter => hasInstance
-                ? snapshot.MachineDisplay + " (" + instance + ")"
-                : snapshot.MachineDisplay,
-            _ => hasInstance
-                ? snapshot.MachineDisplay + " · " + snapshot.Path.Counter + " (" + instance + ")"
-                : snapshot.MachineDisplay + " · " + snapshot.Path.Counter
-        };
-    }
+    public static EncodedSeries Encode(SeriesSnapshot snapshot, ChartGrouping grouping) =>
+        Encode(snapshot, ChartLegend.Label(snapshot, ChartLegend.Context([snapshot]), grouping));
+
+    public static string Legend(SeriesSnapshot snapshot, ChartGrouping grouping) =>
+        ChartLegend.Label(snapshot, ChartLegend.Context([snapshot]), grouping);
 }

@@ -1,5 +1,8 @@
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
+using PerfMonNext.Core;
 using Microsoft.Win32;
 
 namespace PerfMonNext;
@@ -17,9 +20,9 @@ public partial class MainWindow : Window
 
     private void ToggleAddMachine(object sender, RoutedEventArgs e) => _vm.IsAddMachineOpen = !_vm.IsAddMachineOpen;
 
-    private void AddMachine_Click(object sender, RoutedEventArgs e)
+    private async void AddMachine_Click(object sender, RoutedEventArgs e)
     {
-        _vm.AddMachine(MachinePassword.Password);
+        await _vm.AddMachineAsync(MachinePassword.Password);
         MachinePassword.Clear();
     }
 
@@ -113,4 +116,98 @@ public partial class MainWindow : Window
     }
 
     private void ChartScroll_SizeChanged(object sender, SizeChangedEventArgs e) => _vm.SetChartViewport(e.NewSize.Height);
+
+    private int _lastCounterIndex = -1;
+    private int _lastInstanceIndex = -1;
+
+    private void CounterList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        var index = IndexOfListItem(CounterList, e);
+        if (index < 0)
+            return;
+        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift) && _lastCounterIndex >= 0)
+        {
+            var rows = IndexRange.Inclusive(_lastCounterIndex, index)
+                .Where(i => i >= 0 && i < _vm.Counters.Count)
+                .Select(i => _vm.Counters[i])
+                .ToList();
+            _vm.SetCountersChecked(rows, !_vm.Counters[index].IsChecked);
+            e.Handled = true;
+            return;
+        }
+
+        _lastCounterIndex = index;
+    }
+
+    private void CounterList_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.A && Keyboard.Modifiers == ModifierKeys.Control)
+        {
+            _vm.SelectAllCountersCommand.Execute(null);
+            e.Handled = true;
+        }
+    }
+
+    private void InstanceList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        var index = IndexOfListItem(InstanceList, e);
+        if (index < 0)
+            return;
+        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift) && _lastInstanceIndex >= 0)
+        {
+            var rows = IndexRange.Inclusive(_lastInstanceIndex, index)
+                .Where(i => i >= 0 && i < _vm.Instances.Count)
+                .Select(i => _vm.Instances[i])
+                .ToList();
+            _vm.SetInstancesChecked(rows, !_vm.Instances[index].IsChecked);
+            e.Handled = true;
+            return;
+        }
+
+        _lastInstanceIndex = index;
+    }
+
+    private void InstanceList_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.A && Keyboard.Modifiers == ModifierKeys.Control)
+        {
+            _vm.SelectAllInstancesCommand.Execute(null);
+            e.Handled = true;
+        }
+    }
+
+    private void RemoveSelectedSeries_Click(object sender, RoutedEventArgs e) => RemoveSelectedSeries();
+
+    private void SeriesGrid_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Delete)
+        {
+            RemoveSelectedSeries();
+            e.Handled = true;
+        }
+    }
+
+    private void RemoveSelectedSeries()
+    {
+        var keys = SeriesGrid.SelectedItems.OfType<SeriesRowViewModel>().Select(row => row.Key).ToList();
+        _vm.RemoveSeriesMany(keys);
+    }
+
+    private static int IndexOfListItem(ListBox list, MouseButtonEventArgs e)
+    {
+        var item = FindAncestor<ListBoxItem>(e.OriginalSource as DependencyObject);
+        return item is null ? -1 : list.ItemContainerGenerator.IndexFromContainer(item);
+    }
+
+    private static T? FindAncestor<T>(DependencyObject? start) where T : DependencyObject
+    {
+        while (start is not null)
+        {
+            if (start is T match)
+                return match;
+            start = VisualTreeHelper.GetParent(start);
+        }
+
+        return null;
+    }
 }

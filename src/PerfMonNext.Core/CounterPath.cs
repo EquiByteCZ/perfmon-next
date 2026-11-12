@@ -121,6 +121,26 @@ public static class MachineHost
             return displayName.Trim();
         return IsLocal(host) ? "Local" : host!.Trim();
     }
+
+    public static string ShortName(string? host)
+    {
+        var value = Normalize(host);
+        if (value == ".")
+            return value;
+        if (System.Net.IPAddress.TryParse(value, out _))
+            return value;
+        var cut = value.IndexOf('.');
+        return cut <= 0 ? value : value[..cut];
+    }
+
+    public static bool SameHost(string? left, string? right)
+    {
+        var a = Normalize(left);
+        var b = Normalize(right);
+        if (a.Equals(b, StringComparison.OrdinalIgnoreCase))
+            return true;
+        return ShortName(a).Equals(ShortName(b), StringComparison.OrdinalIgnoreCase);
+    }
 }
 
 public static class Ids

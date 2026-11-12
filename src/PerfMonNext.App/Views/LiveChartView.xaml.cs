@@ -3,12 +3,15 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using PerfMonNext.Core;
 using ScottPlot;
+using ScottPlot.Panels;
 
 namespace PerfMonNext.Views;
 
 public partial class LiveChartView : UserControl
 {
     private bool _drawn;
+    private double _lastWidth;
+    private IPanel? _legendPanel;
 
     public static readonly DependencyProperty FrameProperty = DependencyProperty.Register(
         nameof(Frame),
@@ -36,6 +39,13 @@ public partial class LiveChartView : UserControl
             if (e.LeftButton == MouseButtonState.Pressed || e.MiddleButton == MouseButtonState.Pressed)
                 FollowLive = false;
         };
+        Plot.SizeChanged += (_, _) =>
+        {
+            if (Math.Abs(Plot.ActualWidth - _lastWidth) < 16)
+                return;
+            _lastWidth = Plot.ActualWidth;
+            Redraw();
+        };
         Loaded += (_, _) => Redraw();
     }
 
@@ -61,7 +71,16 @@ public partial class LiveChartView : UserControl
         if (!FollowLive && _drawn)
             keep = plot.Axes.GetLimits();
 
+        if (_legendPanel is not null)
+        {
+            plot.Axes.Remove(_legendPanel);
+            _legendPanel = null;
+        }
+
         plot.Clear();
+        plot.HideLegend();
+        plot.Legend.IsVisible = false;
+
         var tick = ScottPlot.Color.FromHex("#E8EEF5");
         var muted = ScottPlot.Color.FromHex("#C5D0DC");
         plot.FigureBackground.Color = ScottPlot.Color.FromHex("#10161D");
@@ -69,8 +88,8 @@ public partial class LiveChartView : UserControl
         plot.Axes.Color(tick);
         plot.Axes.Bottom.TickLabelStyle.ForeColor = tick;
         plot.Axes.Left.TickLabelStyle.ForeColor = tick;
-        plot.Axes.Bottom.TickLabelStyle.FontSize = 11;
-        plot.Axes.Left.TickLabelStyle.FontSize = 11;
+        plot.Axes.Bottom.TickLabelStyle.FontSize = ChartTicks.FontSize;
+        plot.Axes.Left.TickLabelStyle.FontSize = 12;
         plot.Axes.Bottom.MajorTickStyle.Color = muted;
         plot.Axes.Left.MajorTickStyle.Color = muted;
         plot.Axes.Bottom.MinorTickStyle.Color = ScottPlot.Color.FromHex("#3A4A5C");
@@ -78,8 +97,9 @@ public partial class LiveChartView : UserControl
         plot.Grid.MajorLineColor = ScottPlot.Color.FromHex("#2A3646");
         plot.Legend.BackgroundColor = ScottPlot.Color.FromHex("#18212B");
         plot.Legend.FontColor = tick;
-        plot.Legend.FontSize = 12;
+        plot.Legend.FontSize = 10;
         plot.Legend.OutlineColor = ScottPlot.Color.FromHex("#2A3646");
+        plot.Legend.ShadowColor = ScottPlot.Color.FromHex("#00000000");
 
         foreach (var series in Frame.Series)
         {
@@ -92,16 +112,35 @@ public partial class LiveChartView : UserControl
             scatter.LegendText = series.Legend;
         }
 
+        if (Frame.ShowLegend && Frame.LegendOverflow > 0)
+        {
+            var marker = plot.Add.Scatter([double.NaN], [double.NaN]);
+            marker.LegendText = "+" + Frame.LegendOverflow + " more";
+            marker.MarkerSize = 0;
+            marker.LineWidth = 0;
+            marker.Color = muted;
+        }
+
         var bottom = plot.Axes.DateTimeTicksBottom();
         if (bottom.TickGenerator is ScottPlot.TickGenerators.DateTimeAutomatic ticks)
         {
             ticks.LabelFormatter = value => value.ToString("HH:mm:ss");
-            ticks.MaxTickCount = 6;
+            ticks.MaxTickCount = ChartTicks.CountForWidth(Plot.ActualWidth);
         }
         plot.Axes.Bottom.TickLabelStyle.Rotation = 0;
-        plot.Axes.Bottom.MinimumSize = 28;
+        plot.Axes.Bottom.TickLabelStyle.PixelOffset = new PixelOffset(0, 4);
+        plot.Axes.Bottom.MinimumSize = ChartTicks.BottomPad;
+
         if (Frame.ShowLegend)
-            plot.ShowLegend(Alignment.UpperLeft);
+        {
+            plot.Legend.IsVisible = true;
+            _legendPanel = plot.ShowLegend(Edge.Right);
+        }
+        else
+        {
+            plot.HideLegend();
+            plot.Legend.IsVisible = false;
+        }
 
         if (FollowLive && Frame.XMin is double x1 && Frame.XMax is double x2 && Frame.YMin is double y1 && Frame.YMax is double y2)
             plot.Axes.SetLimits(x1, x2, y1, y2);
@@ -112,5 +151,6 @@ public partial class LiveChartView : UserControl
 
         Plot.Refresh();
         _drawn = true;
+        _lastWidth = Plot.ActualWidth;
     }
 }

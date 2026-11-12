@@ -18,7 +18,9 @@ public partial class MainViewModel : ObservableObject
     private readonly ICredentialVault _vault;
     private readonly ISecretProtector _protector;
     private readonly RelogBlgConverter _relog;
+    private readonly IClusterNodeLookup? _clusters;
     private readonly SeriesStore _store = new();
+    private int _bulk;
     private DispatcherTimer? _timer;
     private int _ticking;
     private Workspace _workspace = WorkspaceFactory.CreateNew();
@@ -33,7 +35,8 @@ public partial class MainViewModel : ObservableObject
         WindowsCounterCatalog catalog,
         ICredentialVault vault,
         ISecretProtector protector,
-        RelogBlgConverter relog)
+        RelogBlgConverter relog,
+        IClusterNodeLookup? clusters = null)
     {
         _engine = engine;
         _probe = probe;
@@ -41,6 +44,7 @@ public partial class MainViewModel : ObservableObject
         _vault = vault;
         _protector = protector;
         _relog = relog;
+        _clusters = clusters;
         _settings = AppFiles.LoadSettings();
         if (_settings.LastWorkspacePath is string lastWorkspace && File.Exists(lastWorkspace))
         {
@@ -100,6 +104,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private string instanceBanner = "";
     [ObservableProperty] private string emptyMessage = "";
     [ObservableProperty] private string searchText = "";
+    [ObservableProperty] private string instanceFilter = "";
     [ObservableProperty] private string helpText = "Select a counter to read its explain text.";
     [ObservableProperty] private string pathText = "";
     [ObservableProperty] private string newHost = "";
@@ -158,6 +163,7 @@ public partial class MainViewModel : ObservableObject
     }
 
     partial void OnSearchTextChanged(string value) => RebuildSets();
+    partial void OnInstanceFilterChanged(string value) => RebuildInstances();
     partial void OnScopeAllMachinesChanged(bool value)
     {
         OnPropertyChanged(nameof(ScopeHint));
@@ -298,6 +304,13 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void ResetView()
+    {
+        FollowLive = true;
+        RefreshPresentation();
+    }
+
+    [RelayCommand]
     private void FitScales()
     {
         foreach (var snapshot in _last)
@@ -341,6 +354,24 @@ public partial class MainViewModel : ObservableObject
         RefreshPresentation();
     }
 
+    public void RemoveSeriesMany(IEnumerable<string> keys)
+    {
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var key in keys)
+        {
+            var snapshot = _last.FirstOrDefault(item => item.Key == key);
+            if (snapshot?.SelectionId is string id)
+                ids.Add(id);
+        }
+
+        if (ids.Count == 0)
+            return;
+        _workspace.Counters.RemoveAll(counter => ids.Contains(counter.Id));
+        _store.Prune(_workspace);
+        RebuildCounters();
+        RefreshPresentation();
+    }
+
     [RelayCommand]
     private void CycleColor(string? key)
     {
@@ -351,7 +382,9 @@ public partial class MainViewModel : ObservableObject
         RefreshPresentation();
     }
 
-    public void AddMachine(string password)
+    public void AddMachine(string password) => _ = AddMachineAsync(password);
+
+    public async Task AddMachineAsync(string password)
     {
         var host = string.IsNullOrWhiteSpace(NewHost) ? "." : NewHost.Trim();
         if (UseAlternateCredential && !MachineHost.IsLocal(host) && string.IsNullOrWhiteSpace(NewUserName))
@@ -360,40 +393,74 @@ public partial class MainViewModel : ObservableObject
             return;
         }
 
-        var normalized = MachineHost.Normalize(host);
-        var existing = _workspace.Machines.FirstOrDefault(machine =>
-            string.Equals(MachineHost.Normalize(machine.Host), normalized, StringComparison.OrdinalIgnoreCase));
-        if (existing is not null)
+        ClusterLookup? lookup = null;
+        if (_clusters is not null && !MachineHost.IsLocal(host))
         {
-            Banner = MachineHost.Display(existing.Host, existing.DisplayName) + " is already in the list.";
-            SelectedMachine = Machines.FirstOrDefault(machine => machine.Id == existing.Id);
-            return;
+            Banner = "Checking whether " + host + " is a cluster…";
+            try
+            {
+                var user = UseAlternateCredential ? NewUserName.Trim() : null;
+                lookup = await Task.Run(() => _clusters.TryGetCluster(host, user, password)).ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                Banner = "Could not check for cluster nodes. Adding " + host + " only. " + ex.Message;
+                lookup = null;
+            }
         }
 
-        var target = new MachineTarget
+        var hosts = ClusterExpansion.HostsToAdd(host, lookup);
+        var customName = hosts.Count == 1 && !string.IsNullOrWhiteSpace(NewDisplayName) ? NewDisplayName.Trim() : null;
+        var added = new List<MachineTarget>();
+        foreach (var item in hosts)
         {
-            Id = Ids.New("m"),
-            Host = MachineHost.IsLocal(host) ? "." : host,
-            DisplayName = string.IsNullOrWhiteSpace(NewDisplayName) ? MachineHost.Display(host, null) : NewDisplayName.Trim(),
-            Credential = new MachineCredential
+            var existing = _workspace.Machines.FirstOrDefault(machine => MachineHost.SameHost(machine.Host, item));
+            if (existing is not null)
+                continue;
+
+            var target = new MachineTarget
             {
-                Mode = UseAlternateCredential ? CredentialMode.Alternate : CredentialMode.Current,
-                UserName = UseAlternateCredential ? NewUserName.Trim() : null
-            }
-        };
-        _workspace.Machines.Add(target);
-        if (UseAlternateCredential && !string.IsNullOrWhiteSpace(NewUserName))
-            _vault.Set(target.Id, NewUserName.Trim(), password);
-        if (RememberCredential)
+                Id = Ids.New("m"),
+                Host = MachineHost.IsLocal(item) ? "." : item,
+                DisplayName = customName ?? MachineHost.Display(item, null),
+                Credential = new MachineCredential
+                {
+                    Mode = UseAlternateCredential ? CredentialMode.Alternate : CredentialMode.Current,
+                    UserName = UseAlternateCredential ? NewUserName.Trim() : null
+                }
+            };
+            _workspace.Machines.Add(target);
+            if (UseAlternateCredential && !string.IsNullOrWhiteSpace(NewUserName))
+                _vault.Set(target.Id, NewUserName.Trim(), password);
+            added.Add(target);
+        }
+
+        if (RememberCredential && added.Count > 0)
             PersistCredentials();
 
         BindMachines();
-        SelectedMachine = Machines.FirstOrDefault(machine => machine.Id == target.Id);
+        if (added.Count > 0)
+            SelectedMachine = Machines.FirstOrDefault(machine => machine.Id == added[^1].Id);
+        else if (_workspace.Machines.FirstOrDefault(machine => MachineHost.SameHost(machine.Host, host)) is { } already)
+        {
+            Banner = MachineHost.Display(already.Host, already.DisplayName) + " is already in the list.";
+            SelectedMachine = Machines.FirstOrDefault(machine => machine.Id == already.Id);
+            return;
+        }
+
         NewHost = "";
         NewDisplayName = "";
         NewUserName = "";
         IsAddMachineOpen = false;
-        Banner = "";
+        if (lookup is not null && ClusterExpansion.IsClusterName(host, lookup) && added.Count > 0)
+        {
+            var skipped = hosts.Count - added.Count;
+            Banner = "Added " + added.Count + (added.Count == 1 ? " node" : " nodes")
+                + " from cluster " + lookup.ClusterName
+                + (skipped > 0 ? " (" + skipped + " already in the list)." : ".");
+        }
+        else if (lookup is null || !ClusterExpansion.IsClusterName(host, lookup))
+            Banner = string.IsNullOrEmpty(Banner) || Banner.StartsWith("Checking ", StringComparison.Ordinal) ? "" : Banner;
     }
 
     public void OpenWorkspace(string path)
@@ -470,7 +537,65 @@ public partial class MainViewModel : ObservableObject
             }
             WorkspaceEditor.SetInstances(_workspace, CurrentScopeId, SelectedSet.Name, row.Name, [instance]);
         }
-        RebuildInstances();
+        if (_bulk == 0)
+        {
+            RebuildInstances();
+            RefreshPresentation();
+        }
+    }
+
+    [RelayCommand]
+    private void SelectAllCounters() => SetCountersChecked(Counters.ToList(), true);
+
+    [RelayCommand]
+    private void SelectNoCounters() => SetCountersChecked(Counters.ToList(), false);
+
+    [RelayCommand]
+    private void SelectAllInstances() => SetInstancesChecked(Instances.ToList(), true);
+
+    [RelayCommand]
+    private void SelectNoInstances() => SetInstancesChecked(Instances.ToList(), false);
+
+    public void SetCountersChecked(IReadOnlyList<CounterRowViewModel> rows, bool enabled)
+    {
+        if (rows.Count == 0 || SelectedSet is null)
+            return;
+        _bulk++;
+        try
+        {
+            foreach (var row in rows)
+            {
+                if (row.IsChecked == enabled)
+                    continue;
+                row.SetChecked(enabled);
+                OnCounterToggled(row, enabled);
+            }
+        }
+        finally
+        {
+            _bulk--;
+            if (_bulk <= 0)
+            {
+                _bulk = 0;
+                RebuildInstances();
+                RefreshPresentation();
+            }
+        }
+    }
+
+    public void SetInstancesChecked(IReadOnlyList<InstanceRowViewModel> rows, bool enabled)
+    {
+        if (SelectedSet is null || SelectedCounter is null || rows.Count == 0)
+            return;
+
+        var current = Instances.Where(item => item.IsChecked).Select(item => item.Name).ToList();
+        foreach (var row in rows)
+            current = WorkspaceEditor.ToggleInstance(current, row.Name, enabled).ToList();
+
+        WorkspaceEditor.SetInstances(_workspace, CurrentScopeId, SelectedSet.Name, SelectedCounter.Name, current);
+        foreach (var instance in Instances)
+            instance.SetChecked(current.Contains(instance.Name, StringComparer.OrdinalIgnoreCase));
+        SelectedCounter.SetChecked(current.Count > 0);
         RefreshPresentation();
     }
 
@@ -672,14 +797,21 @@ public partial class MainViewModel : ObservableObject
 
         InstanceBanner = SelectedSet.EnumerationError ?? "";
         var selected = WorkspaceEditor.InstancesFor(_workspace, CurrentScopeId, SelectedSet.Name, SelectedCounter.Name);
-        if (SelectedSet.MultiInstance || SelectedSet.Instances.Count > 0)
+        var filter = InstanceFilter.Trim();
+        if (string.IsNullOrEmpty(filter) && (SelectedSet.MultiInstance || SelectedSet.Instances.Count > 0))
             AddInstance("*", "*   every instance", selected);
-        if (!SelectedSet.MultiInstance && SelectedSet.Instances.Count == 0)
+        if (string.IsNullOrEmpty(filter) && !SelectedSet.MultiInstance && SelectedSet.Instances.Count == 0)
             AddInstance("", "(single instance)", selected);
         foreach (var instance in SelectedSet.Instances)
+        {
+            if (!InstanceMatches(instance, filter))
+                continue;
             AddInstance(instance, instance, selected);
+        }
         _ = ShowHelpAsync(SelectedSet, SelectedCounter);
     }
+
+    public static bool InstanceMatches(string name, string filter) => TokenFilter.Matches(name, filter);
 
 
     private void AddInstance(string name, string label, IReadOnlyList<string> selected)

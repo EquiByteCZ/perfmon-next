@@ -20,7 +20,7 @@ public partial class App : Application
         AppFiles.TryImportCredentials(vault, protector);
         var probe = new WindowsCounterReader(vault);
         var engine = new SamplingEngine(new GuardedCounterPoller(probe));
-        var vm = new MainViewModel(engine, probe, new WindowsCounterCatalog(vault), vault, protector, new RelogBlgConverter());
+        var vm = new MainViewModel(engine, probe, new WindowsCounterCatalog(vault), vault, protector, new RelogBlgConverter(), new WindowsClusterNodeLookup());
         new MainWindow(vm).Show();
     }
 }
