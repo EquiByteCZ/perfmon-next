@@ -13,12 +13,6 @@ public sealed class CounterSetInfo
     public bool MultiInstance { get; init; }
     public IReadOnlyList<string> Instances { get; init; } = [];
     public IReadOnlyList<CounterInfo> Counters { get; init; } = [];
-
-    /// <summary>
-    /// False when the catalog only knows the set name. The picker must load counters
-    /// and instances before it can show them.
-    /// </summary>
-    public bool DetailsLoaded { get; init; } = true;
 }
 
 public sealed class CounterCatalog
@@ -61,8 +55,7 @@ public static class CatalogSearch
                 Help = set.Help,
                 MultiInstance = set.MultiInstance,
                 Instances = set.Instances,
-                Counters = counters,
-                DetailsLoaded = set.DetailsLoaded
+                Counters = counters
             });
         }
 
@@ -88,49 +81,5 @@ public static class CatalogSearch
         }
 
         return true;
-    }
-}
-
-public static class CounterSetBuilder
-{
-    public readonly record struct SampleRow(string Counter, string Instance);
-
-    public static bool NeedsDetailLoad(CounterSetInfo set) => !set.DetailsLoaded;
-
-    public static CounterSetInfo Build(string name, string? help, IReadOnlyList<SampleRow> rows, bool multiHint = false)
-    {
-        var counters = new List<CounterInfo>();
-        var seenCounters = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var instances = new List<string>();
-        var seenInstances = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var row in rows)
-        {
-            if (!string.IsNullOrWhiteSpace(row.Counter) && seenCounters.Add(row.Counter))
-                counters.Add(new CounterInfo { Name = row.Counter.Trim() });
-            if (!string.IsNullOrWhiteSpace(row.Instance)
-                && row.Instance != "*"
-                && seenInstances.Add(row.Instance))
-                instances.Add(row.Instance.Trim());
-        }
-
-        counters.Sort((left, right) => string.Compare(left.Name, right.Name, StringComparison.OrdinalIgnoreCase));
-        instances.Sort((left, right) =>
-        {
-            var leftTotal = left.Equals("_Total", StringComparison.OrdinalIgnoreCase);
-            var rightTotal = right.Equals("_Total", StringComparison.OrdinalIgnoreCase);
-            if (leftTotal != rightTotal)
-                return leftTotal ? -1 : 1;
-            return string.Compare(left, right, StringComparison.OrdinalIgnoreCase);
-        });
-
-        return new CounterSetInfo
-        {
-            Name = name,
-            Help = help ?? "",
-            MultiInstance = multiHint || instances.Count > 0,
-            Instances = instances,
-            Counters = counters,
-            DetailsLoaded = true
-        };
     }
 }
