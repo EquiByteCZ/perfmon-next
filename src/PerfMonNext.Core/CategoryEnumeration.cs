@@ -37,13 +37,15 @@ public static class CategoryEnumeration
         var errors = new List<string>();
         var kind = CategoryInstanceKind.Unknown;
         var totalAvailable = false;
+        var sawMulti = false;
+        var sawSingle = false;
 
         foreach (var source in sources)
         {
             if (source.Kind == CategoryInstanceKind.Multi)
-                kind = CategoryInstanceKind.Multi;
-            else if (source.Kind == CategoryInstanceKind.Single && kind == CategoryInstanceKind.Unknown)
-                kind = CategoryInstanceKind.Single;
+                sawMulti = true;
+            else if (source.Kind == CategoryInstanceKind.Single)
+                sawSingle = true;
 
             foreach (var counter in source.Counters)
             {
@@ -72,8 +74,11 @@ public static class CategoryEnumeration
 
         if (instances.Count > 0)
             kind = CategoryInstanceKind.Multi;
-
-        if (kind == CategoryInstanceKind.Unknown && totalAvailable)
+        else if (sawMulti && !sawSingle)
+            kind = CategoryInstanceKind.Multi;
+        else if (sawSingle)
+            kind = CategoryInstanceKind.Single;
+        else if (totalAvailable)
             kind = CategoryInstanceKind.Multi;
 
         var multi = kind == CategoryInstanceKind.Multi;

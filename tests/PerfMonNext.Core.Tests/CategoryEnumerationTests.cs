@@ -55,6 +55,22 @@ public sealed class CategoryEnumerationTests
     }
 
     [Fact]
+    public void False_positive_total_probe_does_not_upgrade_a_single_instance_set()
+    {
+        var set = CategoryEnumeration.Resolve(
+            "Memory",
+            null,
+            [
+                new("CategoryType", CategoryInstanceKind.Single, ["Available MBytes"], []),
+                new("TotalProbe", CategoryInstanceKind.Multi, ["Available MBytes"], ["_Total"], TotalAvailable: true)
+            ]);
+
+        Assert.False(set.MultiInstance);
+        Assert.Empty(set.Instances);
+        Assert.Null(set.EnumerationError);
+    }
+
+    [Fact]
     public void Declared_single_instance_with_no_instance_names_stays_single()
     {
         var set = CategoryEnumeration.Resolve(

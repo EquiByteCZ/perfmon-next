@@ -145,6 +145,8 @@ public static class WindowsCategorySampler
         try
         {
             var category = new PerformanceCounterCategory(categoryName, pcMachine);
+            if (category.CategoryType == PerformanceCounterCategoryType.SingleInstance)
+                return new CategorySourceSample("TotalProbe", CategoryInstanceKind.Single, [], []);
             counters = category.GetCounters("_Total");
             var names = counters.Select(counter => counter.CounterName).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
             return new CategorySourceSample("TotalProbe", CategoryInstanceKind.Multi, names, ["_Total"], TotalAvailable: true);
