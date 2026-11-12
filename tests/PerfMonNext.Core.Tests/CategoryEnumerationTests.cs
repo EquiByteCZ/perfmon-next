@@ -62,7 +62,7 @@ public sealed class CategoryEnumerationTests
             null,
             [
                 new("CategoryType", CategoryInstanceKind.Single, ["Available MBytes"], []),
-                new("TotalProbe", CategoryInstanceKind.Multi, ["Available MBytes"], ["_Total"], TotalAvailable: true)
+                new("TotalProbe", CategoryInstanceKind.Multi, ["Available MBytes"], [], TotalAvailable: true)
             ]);
 
         Assert.False(set.MultiInstance);

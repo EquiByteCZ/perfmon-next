@@ -21,15 +21,22 @@ public static class WindowsCategorySampler
     {
         var sources = new List<CategorySourceSample>();
         PerformanceCounterCategory? category = null;
+        var kind = CategoryInstanceKind.Unknown;
         try
         {
             category = new PerformanceCounterCategory(categoryName, pcMachine);
-            var kind = KindOf(category.CategoryType);
+            kind = KindOf(category.CategoryType);
             sources.Add(new CategorySourceSample("CategoryType", kind, [], []));
         }
         catch (Exception ex)
         {
             sources.Add(new CategorySourceSample("CategoryType", CategoryInstanceKind.Unknown, [], [], Error: ex.Message));
+        }
+
+        if (kind == CategoryInstanceKind.Single)
+        {
+            sources.Add(FromSingleInstanceCounters(category, pcMachine, categoryName));
+            return CategoryEnumeration.Resolve(categoryName, null, sources);
         }
 
         sources.Add(FromReadCategory(category, pcMachine, categoryName));
@@ -51,6 +58,34 @@ public static class WindowsCategorySampler
         PerformanceCounterCategoryType.SingleInstance => CategoryInstanceKind.Single,
         _ => CategoryInstanceKind.Unknown
     };
+
+    private static CategorySourceSample FromSingleInstanceCounters(PerformanceCounterCategory? existing, string pcMachine, string categoryName)
+    {
+        PerformanceCounter[]? counters = null;
+        try
+        {
+            var category = existing ?? new PerformanceCounterCategory(categoryName, pcMachine);
+            counters = category.GetCounters();
+            return new CategorySourceSample(
+                "GetCounters",
+                CategoryInstanceKind.Single,
+                counters.Select(counter => counter.CounterName).ToArray(),
+                []);
+        }
+        catch (Exception ex)
+        {
+            var fallback = FromReadCategory(existing, pcMachine, categoryName);
+            return fallback with { Kind = CategoryInstanceKind.Single, Instances = [], Error = fallback.Error ?? ex.Message };
+        }
+        finally
+        {
+            if (counters is not null)
+            {
+                foreach (var counter in counters)
+                    counter.Dispose();
+            }
+        }
+    }
 
     private static CategorySourceSample FromReadCategory(PerformanceCounterCategory? existing, string pcMachine, string categoryName)
     {
