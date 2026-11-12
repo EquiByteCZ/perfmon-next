@@ -37,7 +37,8 @@ jobs:
           -o artifacts/win-x64
       - name: Capture screenshots
         if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
-        shell: pwsh
+        continue-on-error: true
+        shell: powershell
         run: |
           .github/scripts/capture-screenshots.ps1 -ExePath artifacts\win-x64\PerfMonNext.exe -OutputDir artifacts\screenshots
       - name: Zip (unsigned CI build)
