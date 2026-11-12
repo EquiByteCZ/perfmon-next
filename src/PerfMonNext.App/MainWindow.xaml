@@ -131,8 +131,8 @@
 
           <Grid>
             <Grid.RowDefinitions>
-              <RowDefinition Height="*"/>
-              <RowDefinition Height="150"/>
+              <RowDefinition Height="2*" MinHeight="140"/>
+              <RowDefinition Height="*" MinHeight="120"/>
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="*"/>
@@ -146,7 +146,7 @@
               <DockPanel DockPanel.Dock="Top" Margin="0,0,0,4">
                 <TextBlock Text="Counters" Foreground="{StaticResource App.Muted}" FontSize="11" VerticalAlignment="Center"/>
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                  <Button Content="Select all" Style="{StaticResource LinkButton}" Command="{Binding SelectAllCountersCommand}" ToolTip="Tick every counter in this list. Shift-click a range, or press Ctrl+A."/>
+                  <Button Content="All" Style="{StaticResource LinkButton}" Command="{Binding SelectAllCountersCommand}" ToolTip="Tick every counter in this list. Shift-click a range, or press Ctrl+A."/>
                   <TextBlock Text=" / " Foreground="{StaticResource App.Muted}" VerticalAlignment="Center" FontSize="11"/>
                   <Button Content="None" Style="{StaticResource LinkButton}" Command="{Binding SelectNoCountersCommand}"/>
                 </StackPanel>
