@@ -28,6 +28,32 @@ public static class NativeShot {
     [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr hWnd, IntPtr hdcBlt, uint nFlags);
     [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
 
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
+    public struct DEVMODE {
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string dmDeviceName;
+        public short dmSpecVersion; public short dmDriverVersion; public short dmSize; public short dmDriverExtra;
+        public int dmFields; public int dmPositionX; public int dmPositionY; public int dmDisplayOrientation; public int dmDisplayFixedOutput;
+        public short dmColor; public short dmDuplex; public short dmYResolution; public short dmTTOption; public short dmCollate;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string dmFormName;
+        public short dmLogPixels; public int dmBitsPerPel; public int dmPelsWidth; public int dmPelsHeight;
+        public int dmDisplayFlags; public int dmDisplayFrequency;
+        public int dmICMMethod; public int dmICMIntent; public int dmMediaType; public int dmDitherType;
+        public int dmReserved1; public int dmReserved2; public int dmPanningWidth; public int dmPanningHeight;
+    }
+    [DllImport("user32.dll", CharSet = CharSet.Ansi)] public static extern bool EnumDisplaySettings(string deviceName, int modeNum, ref DEVMODE devMode);
+    [DllImport("user32.dll", CharSet = CharSet.Ansi)] public static extern int ChangeDisplaySettings(ref DEVMODE devMode, int flags);
+
+    public static string TryResolution(int w, int h) {
+        var dm = new DEVMODE();
+        dm.dmSize = (short)Marshal.SizeOf(typeof(DEVMODE));
+        if (!EnumDisplaySettings(null, -1, ref dm)) return "EnumDisplaySettings failed";
+        string before = dm.dmPelsWidth + "x" + dm.dmPelsHeight;
+        dm.dmPelsWidth = w; dm.dmPelsHeight = h;
+        dm.dmFields = 0x80000 | 0x100000;
+        int rc = ChangeDisplaySettings(ref dm, 0);
+        return "was " + before + ", ChangeDisplaySettings(" + w + "x" + h + ") = " + rc;
+    }
+
     public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
 
     public static void CaptureScreen(IntPtr hwnd, string path) {
@@ -105,12 +131,20 @@ $logPath = Join-Path $OutputDir "capture-log.txt"
 $ExePath = (Resolve-Path $ExePath).Path
 Write-Log "Starting $ExePath"
 
+try {
+    foreach ($size in @(@(1600, 1000), @(1680, 1050), @(1600, 1200), @(1920, 1080), @(1600, 900))) {
+        $msg = [NativeShot]::TryResolution($size[0], $size[1])
+        Write-Log "Display: $msg"
+        if ($msg -match "= 0$") { break }
+    }
+} catch { Write-Log "Display resize failed: $_" }
+
 $proc = Start-Process -FilePath $ExePath -PassThru -WorkingDirectory (Split-Path $ExePath)
 try {
     $hwnd = Wait-AppWindow -Proc $proc -TimeoutSec 90
     Write-Log "Window handle $hwnd"
     [NativeShot]::ShowWindow($hwnd, 9) | Out-Null
-    [NativeShot]::SetWindowPos($hwnd, [IntPtr]::Zero, 40, 40, 1440, 920, 0x0044) | Out-Null
+    [NativeShot]::SetWindowPos($hwnd, [IntPtr]::Zero, 0, 0, 1440, 920, 0x0044) | Out-Null
     Start-Sleep -Milliseconds 500
     [NativeShot]::SetForegroundWindow($hwnd) | Out-Null
     Start-Sleep -Milliseconds 400

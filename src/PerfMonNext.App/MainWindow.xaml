@@ -68,7 +68,7 @@
           <StackPanel DockPanel.Dock="Top">
             <DockPanel Margin="0,0,0,6">
               <TextBlock Text="Machines" FontWeight="SemiBold" VerticalAlignment="Center"/>
-              <Button DockPanel.Dock="Right" Content="Add" Style="{StaticResource QuietButton}" Margin="0" Padding="10,4" Click="ToggleAddMachine"/>
+              <Button DockPanel.Dock="Right" Content="Add" Style="{StaticResource QuietButton}" Margin="0" Padding="10,4" HorizontalAlignment="Right" Click="ToggleAddMachine"/>
             </DockPanel>
             <Border Background="{StaticResource App.Surface2}" CornerRadius="6" Padding="8" Margin="0,0,0,8"
                     Visibility="{Binding IsAddMachineOpen, Converter={StaticResource BoolVis}}">
@@ -112,7 +112,7 @@
             <Separator Background="{StaticResource App.Border}" Margin="0,0,0,8"/>
             <DockPanel Margin="0,0,0,6">
               <TextBlock Text="Counters" FontWeight="SemiBold" VerticalAlignment="Center"/>
-              <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+              <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button Content="Reload" Style="{StaticResource QuietButton}" Command="{Binding ReloadCatalogCommand}" Padding="8,4" Margin="0"/>
                 <Button Content="Starter" Style="{StaticResource QuietButton}" Command="{Binding UseStarterCatalogCommand}" Padding="8,4" Margin="6,0,0,0"/>
               </StackPanel>
@@ -147,7 +147,7 @@
                 <TextBlock DockPanel.Dock="Left" Text="Counters" Foreground="{StaticResource App.Muted}" FontSize="11" VerticalAlignment="Center"/>
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
                   <Button Content="All" Style="{StaticResource LinkButton}" Command="{Binding SelectAllCountersCommand}" ToolTip="Tick every counter in this list. Shift-click a range, or press Ctrl+A."/>
-                  <TextBlock Text="·" Foreground="{StaticResource App.Muted}" VerticalAlignment="Center" FontSize="11"/>
+                  <TextBlock Text="|" Foreground="{StaticResource App.Muted}" VerticalAlignment="Center" FontSize="11" Margin="3,0"/>
                   <Button Content="None" Style="{StaticResource LinkButton}" Command="{Binding SelectNoCountersCommand}" ToolTip="Untick every counter in this list."/>
                 </StackPanel>
               </DockPanel>
@@ -174,7 +174,7 @@
               <DockPanel DockPanel.Dock="Top" Margin="0,0,0,4">
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0,0,0">
                   <Button Content="All" Style="{StaticResource LinkButton}" Command="{Binding SelectAllInstancesCommand}" ToolTip="Tick every instance shown below. Type a filter first to tick only the matches."/>
-                  <TextBlock Text="·" Foreground="{StaticResource App.Muted}" VerticalAlignment="Center" FontSize="11"/>
+                  <TextBlock Text="|" Foreground="{StaticResource App.Muted}" VerticalAlignment="Center" FontSize="11" Margin="3,0"/>
                   <Button Content="None" Style="{StaticResource LinkButton}" Command="{Binding SelectNoInstancesCommand}" ToolTip="Untick every instance shown below."/>
                 </StackPanel>
                 <TextBox Text="{Binding InstanceFilter, UpdateSourceTrigger=PropertyChanged}" Padding="6,3"
@@ -229,22 +229,24 @@
           <DockPanel>
             <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
               <TextBlock Text="Series" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,0"/>
-              <TextBox DockPanel.Dock="Right" Width="240" Text="{Binding PathText, UpdateSourceTrigger=PropertyChanged}" ToolTip="Paste a counter path, for example \Processor(_Total)\% Processor Time"/>
-              <Button DockPanel.Dock="Right" Content="Add path" Style="{StaticResource QuietButton}" Command="{Binding AddPathCommand}" Padding="8,4"/>
-              <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock Text="Selected:" Foreground="{StaticResource App.Muted}" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                <Button Content="Hide" Style="{StaticResource QuietButton}" Padding="8,4" Margin="0,0,6,0"
-                        Click="HideSelectedSeries_Click" ToolTip="Hide the selected series on the charts. They keep collecting. Space toggles."/>
-                <Button Content="Show" Style="{StaticResource QuietButton}" Padding="8,4" Margin="0,0,6,0"
-                        Click="ShowSelectedSeries_Click" ToolTip="Show the selected series on the charts."/>
-                <Button Content="Show only" Style="{StaticResource QuietButton}" Padding="8,4" Margin="0,0,6,0"
-                        Click="ShowOnlySelectedSeries_Click" ToolTip="Show the selected series and hide all others."/>
-                <Button Content="Remove" Style="{StaticResource QuietButton}" Padding="8,4" Margin="0,0,6,0"
-                        Click="RemoveSelectedSeries_Click" ToolTip="Remove the selected series rows. Shift- or Ctrl-click to select many, then press Delete."/>
-                <Button Content="Show all" Style="{StaticResource LinkButton}" VerticalAlignment="Center"
-                        Click="ShowAllSeries_Click" ToolTip="Make every series visible again."/>
-              </StackPanel>
+              <Button DockPanel.Dock="Right" Content="Add path" Style="{StaticResource QuietButton}" Command="{Binding AddPathCommand}" Padding="8,4" Margin="6,0,0,0"/>
+              <TextBox Text="{Binding PathText, UpdateSourceTrigger=PropertyChanged}" MaxWidth="360" HorizontalAlignment="Right" MinWidth="200"
+                       ToolTip="Paste a counter path, for example \Processor(_Total)\% Processor Time"/>
             </DockPanel>
+            <WrapPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,6">
+              <TextBlock Text="Selected rows:" Foreground="{StaticResource App.Muted}" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0"/>
+              <Button Content="Hide" Style="{StaticResource QuietButton}" Padding="8,3" Margin="0,0,6,0"
+                      Click="HideSelectedSeries_Click" ToolTip="Hide the selected series on the charts. They keep collecting. Space toggles."/>
+              <Button Content="Show" Style="{StaticResource QuietButton}" Padding="8,3" Margin="0,0,6,0"
+                      Click="ShowSelectedSeries_Click" ToolTip="Show the selected series on the charts."/>
+              <Button Content="Show only" Style="{StaticResource QuietButton}" Padding="8,3" Margin="0,0,6,0"
+                      Click="ShowOnlySelectedSeries_Click" ToolTip="Show the selected series and hide all others."/>
+              <Button Content="Remove" Style="{StaticResource QuietButton}" Padding="8,3" Margin="0,0,10,0"
+                      Click="RemoveSelectedSeries_Click" ToolTip="Remove the selected series rows. Shift- or Ctrl-click to select many, then press Delete."/>
+              <Button Content="Show all" Style="{StaticResource LinkButton}" VerticalAlignment="Center" Margin="0,0,10,0"
+                      Click="ShowAllSeries_Click" ToolTip="Make every series visible again."/>
+              <TextBlock Text="Space toggles · Del removes · right-click for more" Foreground="{StaticResource App.Muted}" FontSize="11" VerticalAlignment="Center"/>
+            </WrapPanel>
             <DataGrid x:Name="SeriesGrid" ItemsSource="{Binding SeriesRows}" SelectionMode="Extended" SelectionUnit="FullRow"
                       KeyDown="SeriesGrid_KeyDown" PreviewKeyDown="SeriesGrid_PreviewKeyDown">
               <DataGrid.ContextMenu>
@@ -270,7 +272,7 @@
                 </Style>
               </DataGrid.RowStyle>
               <DataGrid.Columns>
-                <DataGridCheckBoxColumn Header="On" Binding="{Binding Visible, UpdateSourceTrigger=PropertyChanged}" Width="42"/>
+                <DataGridCheckBoxColumn Header="On" Binding="{Binding Visible, UpdateSourceTrigger=PropertyChanged}" Width="48"/>
                 <DataGridTemplateColumn Header="" Width="36">
                   <DataGridTemplateColumn.CellTemplate>
                     <DataTemplate>
