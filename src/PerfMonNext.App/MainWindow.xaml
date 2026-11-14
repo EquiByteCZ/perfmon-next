@@ -139,18 +139,18 @@
               <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
             <DockPanel Grid.Row="0" Grid.Column="0" Margin="0,0,4,0">
-              <TextBlock DockPanel.Dock="Top" Text="Sets" Foreground="{StaticResource App.Muted}" FontSize="11" Margin="0,0,0,4"/>
+              <TextBlock DockPanel.Dock="Top" Text="Sets" Foreground="{StaticResource App.Muted}" FontSize="11" Margin="0,1,0,5"/>
               <ListBox ItemsSource="{Binding CatalogSets}" SelectedItem="{Binding SelectedSet}" DisplayMemberPath="Name"/>
             </DockPanel>
             <DockPanel Grid.Row="0" Grid.Column="1" Margin="4,0,0,0">
-              <StackPanel DockPanel.Dock="Top" Margin="0,0,0,4">
-                <TextBlock Text="Counters" Foreground="{StaticResource App.Muted}" FontSize="11"/>
-                <StackPanel Orientation="Horizontal">
+              <DockPanel DockPanel.Dock="Top" Margin="0,0,0,4" LastChildFill="False">
+                <TextBlock DockPanel.Dock="Left" Text="Counters" Foreground="{StaticResource App.Muted}" FontSize="11" VerticalAlignment="Center"/>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
                   <Button Content="All" Style="{StaticResource LinkButton}" Command="{Binding SelectAllCountersCommand}" ToolTip="Tick every counter in this list. Shift-click a range, or press Ctrl+A."/>
-                  <TextBlock Text=" / " Foreground="{StaticResource App.Muted}" VerticalAlignment="Center" FontSize="11"/>
-                  <Button Content="None" Style="{StaticResource LinkButton}" Command="{Binding SelectNoCountersCommand}"/>
+                  <TextBlock Text="·" Foreground="{StaticResource App.Muted}" VerticalAlignment="Center" FontSize="11"/>
+                  <Button Content="None" Style="{StaticResource LinkButton}" Command="{Binding SelectNoCountersCommand}" ToolTip="Untick every counter in this list."/>
                 </StackPanel>
-              </StackPanel>
+              </DockPanel>
               <ListBox x:Name="CounterList" ItemsSource="{Binding Counters}" SelectedItem="{Binding SelectedCounter}"
                        PreviewMouseLeftButtonDown="CounterList_PreviewMouseLeftButtonDown"
                        KeyDown="CounterList_KeyDown">
@@ -173,9 +173,9 @@
                          Visibility="{Binding InstanceBanner, Converter={StaticResource StringVis}}"/>
               <DockPanel DockPanel.Dock="Top" Margin="0,0,0,4">
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0,0,0">
-                  <Button Content="Select all" Style="{StaticResource LinkButton}" Command="{Binding SelectAllInstancesCommand}" ToolTip="Tick every instance shown below. Type a filter first to tick only the matches."/>
-                  <TextBlock Text=" / " Foreground="{StaticResource App.Muted}" VerticalAlignment="Center" FontSize="11"/>
-                  <Button Content="None" Style="{StaticResource LinkButton}" Command="{Binding SelectNoInstancesCommand}"/>
+                  <Button Content="All" Style="{StaticResource LinkButton}" Command="{Binding SelectAllInstancesCommand}" ToolTip="Tick every instance shown below. Type a filter first to tick only the matches."/>
+                  <TextBlock Text="·" Foreground="{StaticResource App.Muted}" VerticalAlignment="Center" FontSize="11"/>
+                  <Button Content="None" Style="{StaticResource LinkButton}" Command="{Binding SelectNoInstancesCommand}" ToolTip="Untick every instance shown below."/>
                 </StackPanel>
                 <TextBox Text="{Binding InstanceFilter, UpdateSourceTrigger=PropertyChanged}" Padding="6,3"
                          ToolTip="Filter instances, for example Hv VP or a VM name, then Select all."/>
@@ -228,14 +228,35 @@
         <Border Grid.Row="2" Background="{StaticResource App.Surface}" BorderBrush="{StaticResource App.Border}" BorderThickness="1" CornerRadius="8" Padding="8">
           <DockPanel>
             <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
-              <TextBlock Text="Series" FontWeight="SemiBold" VerticalAlignment="Center"/>
+              <TextBlock Text="Series" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,0"/>
               <TextBox DockPanel.Dock="Right" Width="240" Text="{Binding PathText, UpdateSourceTrigger=PropertyChanged}" ToolTip="Paste a counter path, for example \Processor(_Total)\% Processor Time"/>
               <Button DockPanel.Dock="Right" Content="Add path" Style="{StaticResource QuietButton}" Command="{Binding AddPathCommand}" Padding="8,4"/>
-              <Button DockPanel.Dock="Right" Content="Remove selected" Style="{StaticResource QuietButton}" Padding="8,4" Margin="0,0,8,0"
-                      Click="RemoveSelectedSeries_Click" ToolTip="Remove the selected series rows. Shift- or Ctrl-click to select many, then press Delete."/>
+              <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="Selected:" Foreground="{StaticResource App.Muted}" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                <Button Content="Hide" Style="{StaticResource QuietButton}" Padding="8,4" Margin="0,0,6,0"
+                        Click="HideSelectedSeries_Click" ToolTip="Hide the selected series on the charts. They keep collecting. Space toggles."/>
+                <Button Content="Show" Style="{StaticResource QuietButton}" Padding="8,4" Margin="0,0,6,0"
+                        Click="ShowSelectedSeries_Click" ToolTip="Show the selected series on the charts."/>
+                <Button Content="Show only" Style="{StaticResource QuietButton}" Padding="8,4" Margin="0,0,6,0"
+                        Click="ShowOnlySelectedSeries_Click" ToolTip="Show the selected series and hide all others."/>
+                <Button Content="Remove" Style="{StaticResource QuietButton}" Padding="8,4" Margin="0,0,6,0"
+                        Click="RemoveSelectedSeries_Click" ToolTip="Remove the selected series rows. Shift- or Ctrl-click to select many, then press Delete."/>
+                <Button Content="Show all" Style="{StaticResource LinkButton}" VerticalAlignment="Center"
+                        Click="ShowAllSeries_Click" ToolTip="Make every series visible again."/>
+              </StackPanel>
             </DockPanel>
             <DataGrid x:Name="SeriesGrid" ItemsSource="{Binding SeriesRows}" SelectionMode="Extended" SelectionUnit="FullRow"
-                      KeyDown="SeriesGrid_KeyDown">
+                      KeyDown="SeriesGrid_KeyDown" PreviewKeyDown="SeriesGrid_PreviewKeyDown">
+              <DataGrid.ContextMenu>
+                <ContextMenu>
+                  <MenuItem Header="Hide selected" InputGestureText="Space" Click="HideSelectedSeries_Click"/>
+                  <MenuItem Header="Show selected" Click="ShowSelectedSeries_Click"/>
+                  <MenuItem Header="Show only these" Click="ShowOnlySelectedSeries_Click"/>
+                  <MenuItem Header="Show all" Click="ShowAllSeries_Click"/>
+                  <Separator/>
+                  <MenuItem Header="Remove selected" InputGestureText="Del" Click="RemoveSelectedSeries_Click"/>
+                </ContextMenu>
+              </DataGrid.ContextMenu>
               <DataGrid.RowStyle>
                 <Style TargetType="DataGridRow">
                   <Setter Property="Background" Value="Transparent"/>

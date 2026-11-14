@@ -22,7 +22,7 @@ public sealed class SamplingTests
                 [new CounterReading(path, 15, SampleQuality.Ok, null)]);
         });
         var reported = new List<MachineReadResult>();
-        new SamplingEngine(poller).Collect(workspace, new Progress<MachineReadResult>(reported.Add));
+        new SamplingEngine(poller).Collect(workspace, new InlineProgress<MachineReadResult>(reported.Add));
         Assert.Equal(2, reported.Count);
         Assert.Contains(reported, result => result.MachineId == "local" && result.Status == MachineStatus.Online);
         Assert.Contains(reported, result => result.MachineId == "n2" && result.Status == MachineStatus.Offline);
@@ -34,7 +34,7 @@ public sealed class SamplingTests
         var workspace = WorkspaceFactory.CreateNew();
         var poller = new ScriptedPoller(_ => throw new InvalidOperationException("registry busy"));
         var reported = new List<MachineReadResult>();
-        new SamplingEngine(poller).Collect(workspace, new Progress<MachineReadResult>(reported.Add));
+        new SamplingEngine(poller).Collect(workspace, new InlineProgress<MachineReadResult>(reported.Add));
         var result = Assert.Single(reported);
         Assert.Equal(MachineStatus.Error, result.Status);
         Assert.Contains("registry busy", result.Message, StringComparison.Ordinal);
@@ -280,5 +280,17 @@ public sealed class PersistenceTests
         }
 
         public byte[] Unprotect(byte[] protectedBytes) => Protect(protectedBytes);
+    }
+}
+
+/// <summary>Reports synchronously so tests do not race the thread pool like <see cref="Progress{T}"/>.</summary>
+internal sealed class InlineProgress<T>(Action<T> handler) : IProgress<T>
+{
+    private readonly object _gate = new();
+
+    public void Report(T value)
+    {
+        lock (_gate)
+            handler(value);
     }
 }

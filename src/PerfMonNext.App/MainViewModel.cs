@@ -674,6 +674,27 @@ public partial class MainViewModel : ObservableObject
         RefreshPresentation();
     }
 
+    public void ApplyVisibility(IReadOnlyDictionary<string, bool> plan)
+    {
+        if (plan.Count == 0)
+            return;
+        foreach (var (key, visible) in plan)
+            _workspace.Visibility[key] = visible;
+        RefreshPresentation();
+    }
+
+    public void SetVisibleMany(IEnumerable<SeriesRowViewModel> rows, bool visible) =>
+        ApplyVisibility(SeriesVisibility.Set(rows.Select(row => row.OverrideKey), visible));
+
+    public void ToggleVisibleMany(IEnumerable<SeriesRowViewModel> rows) =>
+        ApplyVisibility(SeriesVisibility.Toggle(rows.Select(row => (row.OverrideKey, row.Visible))));
+
+    public void ShowOnly(IEnumerable<SeriesRowViewModel> rows) =>
+        ApplyVisibility(SeriesVisibility.ShowOnly(SeriesRows.Select(row => row.OverrideKey), rows.Select(row => row.OverrideKey)));
+
+    public void ShowAllSeries() =>
+        ApplyVisibility(SeriesVisibility.Set(SeriesRows.Select(row => row.OverrideKey), true));
+
     private void Tick()
     {
         if (Interlocked.Exchange(ref _ticking, 1) == 1)

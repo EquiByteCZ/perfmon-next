@@ -30,6 +30,19 @@ public static class NativeShot {
 
     public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
 
+    public static void CaptureScreen(IntPtr hwnd, string path) {
+        RECT r;
+        if (!GetWindowRect(hwnd, out r)) throw new Exception("GetWindowRect failed");
+        int w = Math.Max(1, r.Right - r.Left);
+        int h = Math.Max(1, r.Bottom - r.Top);
+        using (var bmp = new Bitmap(w, h, PixelFormat.Format32bppArgb)) {
+            using (var g = Graphics.FromImage(bmp)) {
+                g.CopyFromScreen(r.Left, r.Top, 0, 0, new Size(w, h), CopyPixelOperation.SourceCopy);
+            }
+            bmp.Save(path, ImageFormat.Png);
+        }
+    }
+
     public static void Capture(IntPtr hwnd, string path) {
         RECT r;
         if (!GetWindowRect(hwnd, out r)) throw new Exception("GetWindowRect failed");
@@ -137,6 +150,32 @@ try {
             [NativeShot]::Capture($hwnd, $pickerPath)
             Write-Log "Wrote fallback $pickerPath"
         }
+    }
+
+    # Series bulk actions: select every row, open the right-click menu, capture from the screen
+    # so the popup menu is included.
+    try {
+        $root = Get-AutomationWindow $hwnd
+        $gridCond = New-Object System.Windows.Automation.PropertyCondition (
+            [System.Windows.Automation.AutomationElement]::AutomationIdProperty, "SeriesGrid")
+        $grid = $root.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $gridCond)
+        if ($grid) {
+            [NativeShot]::SetForegroundWindow($hwnd) | Out-Null
+            $grid.SetFocus()
+            Start-Sleep -Milliseconds 300
+            [System.Windows.Forms.SendKeys]::SendWait("^a")
+            Start-Sleep -Milliseconds 300
+            [System.Windows.Forms.SendKeys]::SendWait("+{F10}")
+            Start-Sleep -Milliseconds 900
+            $menuPath = Join-Path $OutputDir "series-bulk-actions.png"
+            [NativeShot]::CaptureScreen($hwnd, $menuPath)
+            Write-Log "Wrote $menuPath"
+            [System.Windows.Forms.SendKeys]::SendWait("{ESC}")
+        } else {
+            Write-Log "Series grid not found via UI Automation; skipping bulk-actions shot."
+        }
+    } catch {
+        Write-Log "Series menu automation failed: $_"
     }
 } finally {
     try {

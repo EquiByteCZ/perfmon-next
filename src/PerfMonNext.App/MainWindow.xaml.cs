@@ -187,6 +187,33 @@ public partial class MainWindow : Window
         }
     }
 
+    private void HideSelectedSeries_Click(object sender, RoutedEventArgs e) => _vm.SetVisibleMany(SelectedSeriesRows(), false);
+
+    private void ShowSelectedSeries_Click(object sender, RoutedEventArgs e) => _vm.SetVisibleMany(SelectedSeriesRows(), true);
+
+    private void ShowOnlySelectedSeries_Click(object sender, RoutedEventArgs e) => _vm.ShowOnly(SelectedSeriesRows());
+
+    private void ShowAllSeries_Click(object sender, RoutedEventArgs e) => _vm.ShowAllSeries();
+
+    private void SeriesGrid_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Space || Keyboard.Modifiers != ModifierKeys.None)
+            return;
+        // Let Space type into the Scale cell editor.
+        if (e.OriginalSource is TextBox)
+            return;
+        var rows = SelectedSeriesRows();
+        if (rows.Count == 0)
+            return;
+        if (SeriesGrid.IsKeyboardFocusWithin)
+            SeriesGrid.CommitEdit(DataGridEditingUnit.Row, true);
+        _vm.ToggleVisibleMany(rows);
+        e.Handled = true;
+    }
+
+    private List<SeriesRowViewModel> SelectedSeriesRows() =>
+        SeriesGrid.SelectedItems.OfType<SeriesRowViewModel>().ToList();
+
     private void RemoveSelectedSeries()
     {
         var keys = SeriesGrid.SelectedItems.OfType<SeriesRowViewModel>().Select(row => row.Key).ToList();
