@@ -81,25 +81,9 @@ public partial class LiveChartView : UserControl
         plot.HideLegend();
         plot.Legend.IsVisible = false;
 
-        var tick = ScottPlot.Color.FromHex("#E8EEF5");
-        var muted = ScottPlot.Color.FromHex("#C5D0DC");
-        plot.FigureBackground.Color = ScottPlot.Color.FromHex("#10161D");
-        plot.DataBackground.Color = ScottPlot.Color.FromHex("#10161D");
-        plot.Axes.Color(tick);
-        plot.Axes.Bottom.TickLabelStyle.ForeColor = tick;
-        plot.Axes.Left.TickLabelStyle.ForeColor = tick;
-        plot.Axes.Bottom.TickLabelStyle.FontSize = ChartTicks.FontSize;
-        plot.Axes.Left.TickLabelStyle.FontSize = 12;
-        plot.Axes.Bottom.MajorTickStyle.Color = muted;
-        plot.Axes.Left.MajorTickStyle.Color = muted;
-        plot.Axes.Bottom.MinorTickStyle.Color = ScottPlot.Color.FromHex("#3A4A5C");
-        plot.Axes.Left.MinorTickStyle.Color = ScottPlot.Color.FromHex("#3A4A5C");
-        plot.Grid.MajorLineColor = ScottPlot.Color.FromHex("#2A3646");
-        plot.Legend.BackgroundColor = ScottPlot.Color.FromHex("#18212B");
-        plot.Legend.FontColor = tick;
-        plot.Legend.FontSize = 10;
-        plot.Legend.OutlineColor = ScottPlot.Color.FromHex("#2A3646");
-        plot.Legend.ShadowColor = ScottPlot.Color.FromHex("#00000000");
+        var palette = ChartPalette.ForSkin(TryFindResource("App.ChartSkin") as string);
+        plot.FigureBackground.Color = ScottPlot.Color.FromHex(palette.Background);
+        plot.DataBackground.Color = ScottPlot.Color.FromHex(palette.Background);
 
         foreach (var series in Frame.Series)
         {
@@ -118,7 +102,7 @@ public partial class LiveChartView : UserControl
             marker.LegendText = "+" + Frame.LegendOverflow + " more";
             marker.MarkerSize = 0;
             marker.LineWidth = 0;
-            marker.Color = muted;
+            marker.Color = ScottPlot.Color.FromHex(palette.OverflowText);
         }
 
         var bottom = plot.Axes.DateTimeTicksBottom();
@@ -129,6 +113,10 @@ public partial class LiveChartView : UserControl
         }
         plot.Axes.Bottom.TickLabelStyle.Rotation = 0;
         plot.Axes.Bottom.MinimumSize = ChartTicks.BottomPad;
+
+        // Style after DateTimeTicksBottom(): it replaces the bottom axis with a fresh one that
+        // carries ScottPlot's default (dark) colors, which made the X labels unreadable.
+        ApplyPalette(plot, palette);
 
         if (Frame.ShowLegend)
         {
@@ -151,5 +139,32 @@ public partial class LiveChartView : UserControl
         Plot.Refresh();
         _drawn = true;
         _lastWidth = Plot.ActualWidth;
+    }
+
+    private static void ApplyPalette(ScottPlot.Plot plot, ChartPalette palette)
+    {
+        var tick = ScottPlot.Color.FromHex(palette.TickLabel);
+        var title = ScottPlot.Color.FromHex(palette.AxisTitle);
+        var line = ScottPlot.Color.FromHex(palette.AxisLine);
+        var major = ScottPlot.Color.FromHex(palette.MajorTick);
+        var minor = ScottPlot.Color.FromHex(palette.MinorTick);
+        foreach (var axis in plot.Axes.GetAxes())
+        {
+            axis.TickLabelStyle.ForeColor = tick;
+            axis.Label.ForeColor = title;
+            axis.FrameLineStyle.Color = line;
+            axis.MajorTickStyle.Color = major;
+            axis.MinorTickStyle.Color = minor;
+        }
+
+        plot.Axes.Bottom.TickLabelStyle.FontSize = ChartTicks.FontSize;
+        plot.Axes.Left.TickLabelStyle.FontSize = 12;
+        plot.Grid.MajorLineColor = ScottPlot.Color.FromHex(palette.Grid);
+        plot.Grid.MinorLineColor = ScottPlot.Color.FromHex(palette.Background);
+        plot.Legend.BackgroundColor = ScottPlot.Color.FromHex(palette.LegendBackground);
+        plot.Legend.FontColor = ScottPlot.Color.FromHex(palette.LegendText);
+        plot.Legend.FontSize = 10;
+        plot.Legend.OutlineColor = ScottPlot.Color.FromHex(palette.LegendOutline);
+        plot.Legend.ShadowColor = ScottPlot.Color.FromHex("#00000000");
     }
 }

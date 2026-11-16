@@ -214,6 +214,24 @@ public partial class MainWindow : Window
     private List<SeriesRowViewModel> SelectedSeriesRows() =>
         SeriesGrid.SelectedItems.OfType<SeriesRowViewModel>().ToList();
 
+    private void RemoveAllSeries_Click(object sender, RoutedEventArgs e)
+    {
+        var series = _vm.SeriesRows.Count;
+        var selections = _vm.CounterSelectionCount;
+        if (selections == 0)
+            return;
+        if (WorkspaceEditor.ClearNeedsConfirmation(Math.Max(series, selections)))
+        {
+            var answer = MessageBox.Show(this,
+                "Remove all " + series + " series (" + selections + " counter selections)? Machines stay in the list.",
+                "Remove all counters", MessageBoxButton.OKCancel, MessageBoxImage.Question, MessageBoxResult.Cancel);
+            if (answer != MessageBoxResult.OK)
+                return;
+        }
+
+        _vm.ClearAllCounters();
+    }
+
     private void RemoveSelectedSeries()
     {
         var keys = SeriesGrid.SelectedItems.OfType<SeriesRowViewModel>().Select(row => row.Key).ToList();

@@ -245,6 +245,8 @@
                       Click="RemoveSelectedSeries_Click" ToolTip="Remove the selected series rows. Shift- or Ctrl-click to select many, then press Delete."/>
               <Button Content="Show all" Style="{StaticResource LinkButton}" VerticalAlignment="Center" Margin="0,0,10,0"
                       Click="ShowAllSeries_Click" ToolTip="Make every series visible again."/>
+              <Button Content="Remove all" Style="{StaticResource QuietButton}" Padding="8,3" Margin="0,0,10,0"
+                      Click="RemoveAllSeries_Click" ToolTip="Remove every counter and series and untick the picker. Machines stay."/>
               <TextBlock Text="Space toggles · Del removes · right-click for more" Foreground="{StaticResource App.Muted}" FontSize="11" VerticalAlignment="Center"/>
             </WrapPanel>
             <DataGrid x:Name="SeriesGrid" ItemsSource="{Binding SeriesRows}" SelectionMode="Extended" SelectionUnit="FullRow"
@@ -257,6 +259,7 @@
                   <MenuItem Header="Show all" Click="ShowAllSeries_Click"/>
                   <Separator/>
                   <MenuItem Header="Remove selected" InputGestureText="Del" Click="RemoveSelectedSeries_Click"/>
+                  <MenuItem Header="Remove all" Click="RemoveAllSeries_Click"/>
                 </ContextMenu>
               </DataGrid.ContextMenu>
               <DataGrid.RowStyle>

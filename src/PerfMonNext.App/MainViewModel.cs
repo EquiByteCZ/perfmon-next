@@ -402,6 +402,21 @@ public partial class MainViewModel : ObservableObject
         RefreshPresentation();
     }
 
+    public int CounterSelectionCount => _workspace.Counters.Count;
+
+    /// <summary>Removes every counter and series (machines stay) and unticks the picker.</summary>
+    public void ClearAllCounters()
+    {
+        var removed = WorkspaceEditor.ClearCounters(_workspace);
+        if (removed == 0)
+            return;
+        _store.Prune(_workspace);
+        RebuildCounters();
+        RebuildInstances();
+        RefreshPresentation();
+        Banner = "Removed all " + removed + " counter selection" + (removed == 1 ? "" : "s") + ". Machines are unchanged.";
+    }
+
     public void RemoveSeriesMany(IEnumerable<string> keys)
     {
         var ids = new HashSet<string>(StringComparer.Ordinal);

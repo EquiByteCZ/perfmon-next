@@ -175,6 +175,25 @@ public static class WorkspaceSanitizer
 
 public static class WorkspaceEditor
 {
+    /// <summary>Ask before clearing when more than this many series would disappear.</summary>
+    public const int ConfirmClearAbove = 3;
+
+    public static bool ClearNeedsConfirmation(int seriesCount) => seriesCount > ConfirmClearAbove;
+
+    /// <summary>
+    /// Removes every counter selection and its per-series display overrides (visibility, scale, color).
+    /// Machines are left alone. Returns how many selections were removed.
+    /// </summary>
+    public static int ClearCounters(Workspace workspace)
+    {
+        var removed = workspace.Counters.Count;
+        workspace.Counters.Clear();
+        workspace.Visibility.Clear();
+        workspace.ScaleOverrides.Clear();
+        workspace.ColorOverrides.Clear();
+        return removed;
+    }
+
     public static CounterSelection AddCounterPath(Workspace workspace, string pathText, string scopeMachineId)
     {
         var path = CounterPathParser.Parse(pathText);
