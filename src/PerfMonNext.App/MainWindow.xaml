@@ -71,7 +71,7 @@
           <StackPanel DockPanel.Dock="Top">
             <DockPanel Margin="0,0,0,6">
               <TextBlock Text="Machines" FontWeight="SemiBold" VerticalAlignment="Center"/>
-              <Button DockPanel.Dock="Right" Content="Add" Style="{StaticResource QuietButton}" Margin="0" Padding="10,4" HorizontalAlignment="Right" Click="ToggleAddMachine"/>
+              <Button DockPanel.Dock="Right" Content="Add" Style="{StaticResource QuietButton}" Margin="0" Padding="10,4" HorizontalAlignment="Right" Click="ToggleAddMachine" AutomationProperties.AutomationId="AddMachineToggle"/>
             </DockPanel>
             <Border Background="{StaticResource App.Surface2}" CornerRadius="6" Padding="8" Margin="0,0,0,8"
                     Visibility="{Binding IsAddMachineOpen, Converter={StaticResource BoolVis}}">
@@ -79,12 +79,12 @@
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
                   <RadioButton Content="Server" GroupName="AddKind" IsChecked="{Binding AddAsServer}" Margin="0,0,16,0"
                                ToolTip="Add one computer by name or IP address."/>
-                  <RadioButton Content="Cluster (all nodes)" GroupName="AddKind" IsChecked="{Binding AddAsCluster}"
+                  <RadioButton Content="Cluster (all nodes)" GroupName="AddKind" IsChecked="{Binding AddAsCluster}" AutomationProperties.AutomationId="AddKindCluster"
                                ToolTip="Type a failover cluster name (or any node). PerfMon Next reads the node list over WMI and lets you pick the nodes to add."/>
                 </StackPanel>
                 <TextBlock Text="Host (. for this computer)" Foreground="{StaticResource App.Muted}" FontSize="11" Visibility="{Binding AddAsServer, Converter={StaticResource BoolVis}}"/>
                 <TextBlock Text="Cluster name (or any node of the cluster)" Foreground="{StaticResource App.Muted}" FontSize="11" Visibility="{Binding AddAsCluster, Converter={StaticResource BoolVis}}"/>
-                <TextBox Text="{Binding NewHost, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,0" ToolTip="Host or cluster name. Use . for this computer."/>
+                <TextBox Text="{Binding NewHost, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,0" AutomationProperties.AutomationId="NewHostBox" ToolTip="Host or cluster name. Use . for this computer."/>
                 <StackPanel Visibility="{Binding AddAsServer, Converter={StaticResource BoolVis}}">
                   <TextBlock Text="Display name" Foreground="{StaticResource App.Muted}" FontSize="11" Margin="0,6,0,0"/>
                   <TextBox Text="{Binding NewDisplayName, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,0"/>
@@ -93,7 +93,7 @@
                 <TextBox Text="{Binding NewUserName, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,0" ToolTip="DOMAIN\user" Visibility="{Binding UseAlternateCredential, Converter={StaticResource BoolVis}}"/>
                 <PasswordBox x:Name="MachinePassword" Margin="0,6,0,0" ToolTip="Password is kept for this session, not in the workspace file." Visibility="{Binding UseAlternateCredential, Converter={StaticResource BoolVis}}"/>
                 <CheckBox Content="Remember on this PC" IsChecked="{Binding RememberCredential}" Margin="0,6,0,0" Visibility="{Binding UseAlternateCredential, Converter={StaticResource BoolVis}}"/>
-                <Button Content="{Binding AddButtonText}" Style="{StaticResource PrimaryButton}" Margin="0,8,0,0" HorizontalAlignment="Left" Click="AddMachine_Click"
+                <Button Content="{Binding AddButtonText}" Style="{StaticResource PrimaryButton}" Margin="0,8,0,0" HorizontalAlignment="Left" Click="AddMachine_Click" AutomationProperties.AutomationId="AddMachineButton"
                         IsEnabled="{Binding IsClusterBusy, Converter={StaticResource InverseBool}}"/>
                 <StackPanel Visibility="{Binding AddAsCluster, Converter={StaticResource BoolVis}}">
                   <TextBlock Text="{Binding ClusterMessage}" TextWrapping="Wrap" FontSize="11" Margin="0,6,0,0">

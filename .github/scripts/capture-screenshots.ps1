@@ -276,6 +276,44 @@ try {
         Write-Log "Series menu automation failed: $_"
     }
 
+    # Add machine as a cluster: open the Add panel, pick "Cluster (all nodes)", type this runner's own name
+    # (not a cluster) and press Find nodes, so the shot shows the cluster form and its error message.
+    try {
+        [NativeShot]::SetForegroundWindow($hwnd) | Out-Null
+        $root = Get-AutomationWindow $hwnd
+        function Find-ById([string]$Id) {
+            $root.FindFirst([System.Windows.Automation.TreeScope]::Descendants,
+                (New-Object System.Windows.Automation.PropertyCondition ([System.Windows.Automation.AutomationElement]::AutomationIdProperty, $Id)))
+        }
+        $toggle = Find-ById "AddMachineToggle"
+        if ($toggle) {
+            $toggle.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+            Start-Sleep -Milliseconds 500
+            $radio = Find-ById "AddKindCluster"
+            $radio.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
+            Start-Sleep -Milliseconds 300
+            $box = Find-ById "NewHostBox"
+            $box.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).SetValue($env:COMPUTERNAME)
+            Start-Sleep -Milliseconds 300
+            (Find-ById "AddMachineButton").GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+            $deadline = (Get-Date).AddSeconds(100)
+            do {
+                Start-Sleep -Seconds 1
+                $btn = Find-ById "AddMachineButton"
+            } while ($btn -and -not $btn.Current.IsEnabled -and (Get-Date) -lt $deadline)
+            Start-Sleep -Milliseconds 800
+            $clusterPath = Join-Path $OutputDir "add-cluster.png"
+            [NativeShot]::Capture($hwnd, $clusterPath)
+            Write-Log "Wrote $clusterPath (cluster lookup of $env:COMPUTERNAME)"
+            $toggle.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+            Start-Sleep -Milliseconds 300
+        } else {
+            Write-Log "Add machine button not found."
+        }
+    } catch {
+        Write-Log "Add cluster capture failed: $_"
+    }
+
     # About window (modal): invoke the About button, then capture the dialog's own window.
     try {
         [NativeShot]::SetForegroundWindow($hwnd) | Out-Null
