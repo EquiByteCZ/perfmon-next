@@ -74,7 +74,7 @@ Keys in the table: **Space** toggles the selection (if any selected series is vi
 
 The left pane has:
 
-- **Machines** — **Add** a host (`.` is this computer), **Test** connectivity, or **Remove** a machine. Optional alternate credentials can be remembered on this PC. Type a failover **cluster name** and all of its nodes are added at once; there is no separate option to tick.
+- **Machines** — **Add** a host (`.` is this computer), **Test** connectivity, or **Remove** a machine. Optional alternate credentials can be remembered on this PC. Choose **Server** to add one computer, or **Cluster (all nodes)** to type a failover cluster name, press **Find nodes**, untick any node you do not want, and add the rest in one step. Nodes already in the list are shown as *already added*, and cluster nodes are labelled with their cluster in the Machines list.
 - **Counters** — **Reload** reads the catalog from the selected machine. **Starter** shows a built-in subset (processor, memory, disk, Hyper-V, CSV, SMB) when a remote catalog is slow or down. The search box filters sets, counters, instances, and help text.
 - **Add to all machines** — one tick creates the counter on every machine. Clear it to target only the selected machine.
 - **Sets**, **Counters**, and **Instances** lists — tick a counter (and an instance when the set is multi-instance) to add it. Multi-instance counters accept `*` (every instance, expanded while sampling) or a prefix such as `chrome*`. `_Total` is the default when that instance exists.

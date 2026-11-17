@@ -26,6 +26,8 @@ public sealed class MachineTarget
     public string Id { get; set; } = Ids.New("m");
     public string Host { get; set; } = ".";
     public string DisplayName { get; set; } = "Local";
+    /// <summary>Failover cluster the machine was added from, if any. Only used as a label.</summary>
+    public string? Cluster { get; set; }
     public MachineCredential Credential { get; set; } = new();
 }
 

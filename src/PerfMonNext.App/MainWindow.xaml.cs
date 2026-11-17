@@ -24,8 +24,18 @@ public partial class MainWindow : Window
 
     private async void AddMachine_Click(object sender, RoutedEventArgs e)
     {
+        var clusterSearch = _vm.AddAsCluster;
         await _vm.AddMachineAsync(MachinePassword.Password);
-        MachinePassword.Clear();
+        // Keep the password while the user picks cluster nodes; it is needed when they are added.
+        if (!clusterSearch)
+            MachinePassword.Clear();
+    }
+
+    private void AddClusterNodes_Click(object sender, RoutedEventArgs e)
+    {
+        _vm.AddClusterNodes(MachinePassword.Password);
+        if (!_vm.IsAddMachineOpen)
+            MachinePassword.Clear();
     }
 
     private void Open_Click(object sender, RoutedEventArgs e) => OpenWorkspace();

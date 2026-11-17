@@ -497,45 +497,238 @@ public partial class MainViewModel : ObservableObject
 
     public void AddMachine(string password) => _ = AddMachineAsync(password);
 
+    public ObservableCollection<ClusterNodeRowViewModel> ClusterNodes { get; } = [];
+    [ObservableProperty] private bool addAsCluster;
+    [ObservableProperty] private bool isClusterBusy;
+    [ObservableProperty] private string clusterMessage = "";
+    [ObservableProperty] private bool clusterMessageIsError;
+    private string? _foundClusterName;
+    private string? _foundClusterHost;
+    private CancellationTokenSource? _clusterCts;
+
+    public bool AddAsServer
+    {
+        get => !AddAsCluster;
+        set => AddAsCluster = !value;
+    }
+
+    public bool HasClusterNodes => ClusterNodes.Count > 0;
+    public int SelectedClusterNodeCount => ClusterNodes.Count(node => node.IsChecked && !node.AlreadyAdded);
+    public string AddClusterNodesText => SelectedClusterNodeCount switch
+    {
+        0 => "No new nodes selected",
+        1 => "Add 1 node",
+        var n => "Add " + n + " nodes"
+    };
+    public string AddButtonText => AddAsCluster ? (IsClusterBusy ? "Reading cluster…" : "Find nodes") : "Add machine";
+
+    partial void OnAddAsClusterChanged(bool value)
+    {
+        OnPropertyChanged(nameof(AddAsServer));
+        OnPropertyChanged(nameof(AddButtonText));
+        ResetClusterDiscovery();
+    }
+
+    partial void OnIsClusterBusyChanged(bool value) => OnPropertyChanged(nameof(AddButtonText));
+
+    partial void OnNewHostChanged(string value)
+    {
+        if (_foundClusterHost is not null && !string.Equals(_foundClusterHost, value?.Trim(), StringComparison.OrdinalIgnoreCase))
+            ResetClusterDiscovery();
+    }
+
+    partial void OnIsAddMachineOpenChanged(bool value)
+    {
+        if (!value)
+            ResetClusterDiscovery();
+    }
+
+    internal void OnClusterNodeToggled()
+    {
+        OnPropertyChanged(nameof(SelectedClusterNodeCount));
+        OnPropertyChanged(nameof(AddClusterNodesText));
+    }
+
+    [RelayCommand]
+    private void SelectAllClusterNodes() => SetAllClusterNodes(true);
+
+    [RelayCommand]
+    private void SelectNoClusterNodes() => SetAllClusterNodes(false);
+
+    private void SetAllClusterNodes(bool value)
+    {
+        foreach (var node in ClusterNodes.Where(node => !node.AlreadyAdded))
+            node.IsChecked = value;
+        OnClusterNodeToggled();
+    }
+
+    private void ResetClusterDiscovery()
+    {
+        _clusterCts?.Cancel();
+        _clusterCts = null;
+        IsClusterBusy = false;
+        ClusterNodes.Clear();
+        _foundClusterName = null;
+        _foundClusterHost = null;
+        ClusterMessage = "";
+        ClusterMessageIsError = false;
+        OnPropertyChanged(nameof(HasClusterNodes));
+        OnClusterNodeToggled();
+    }
+
+    /// <summary>Primary button of the Add panel: adds a server, or reads the cluster's node list.</summary>
     public async Task AddMachineAsync(string password)
     {
-        var host = string.IsNullOrWhiteSpace(NewHost) ? "." : NewHost.Trim();
-        if (UseAlternateCredential && !MachineHost.IsLocal(host) && string.IsNullOrWhiteSpace(NewUserName))
+        if (AddAsCluster)
         {
-            Banner = "Enter a user name for the alternate credentials.";
+            await FindClusterNodesAsync(password).ConfigureAwait(true);
             return;
         }
 
-        ClusterLookup? lookup = null;
-        if (_clusters is not null && !MachineHost.IsLocal(host))
+        var host = string.IsNullOrWhiteSpace(NewHost) ? "." : NewHost.Trim();
+        if (!CheckCredentialInput(host))
+            return;
+
+        var customName = string.IsNullOrWhiteSpace(NewDisplayName) ? null : NewDisplayName.Trim();
+        if (_workspace.Machines.FirstOrDefault(machine => MachineHost.SameHost(machine.Host, host)) is { } already)
         {
-            Banner = "Checking whether " + host + " is a cluster…";
-            try
-            {
-                var user = UseAlternateCredential ? NewUserName.Trim() : null;
-                lookup = await Task.Run(() => _clusters.TryGetCluster(host, user, password)).ConfigureAwait(true);
-            }
-            catch (Exception ex)
-            {
-                Banner = "Could not check for cluster nodes. Adding " + host + " only. " + ex.Message;
-                lookup = null;
-            }
+            Banner = MachineHost.Display(already.Host, already.DisplayName) + " is already in the list.";
+            SelectedMachine = Machines.FirstOrDefault(machine => machine.Id == already.Id);
+            return;
         }
 
-        var hosts = ClusterExpansion.HostsToAdd(host, lookup);
-        var customName = hosts.Count == 1 && !string.IsNullOrWhiteSpace(NewDisplayName) ? NewDisplayName.Trim() : null;
+        var added = AddTargets([host], customName, null, password);
+        FinishAdd(added);
+        Banner = "";
+    }
+
+    public async Task FindClusterNodesAsync(string password)
+    {
+        var host = NewHost?.Trim() ?? "";
+        if (string.IsNullOrWhiteSpace(host) || MachineHost.IsLocal(host))
+        {
+            ClusterMessage = "Enter the cluster name (or the name of any node in the cluster).";
+            ClusterMessageIsError = true;
+            return;
+        }
+
+        if (!CheckCredentialInput(host))
+            return;
+        if (_clusters is null)
+        {
+            ClusterMessage = "Cluster discovery is not available in this build.";
+            ClusterMessageIsError = true;
+            return;
+        }
+
+        ResetClusterDiscovery();
+        var cts = new CancellationTokenSource();
+        _clusterCts = cts;
+        IsClusterBusy = true;
+        ClusterMessage = "Reading the node list of " + host + "…";
+        var user = UseAlternateCredential ? NewUserName.Trim() : null;
+        ClusterQueryResult result;
+        try
+        {
+            var query = Task.Run(() => _clusters.Query(host, user, password, cts.Token));
+            var finished = await Task.WhenAny(query, Task.Delay(TimeSpan.FromSeconds(90), cts.Token)).ConfigureAwait(true);
+            if (cts.IsCancellationRequested)
+                return;
+            result = finished == query
+                ? await query.ConfigureAwait(true)
+                : ClusterQueryResult.Error(ClusterQueryStatus.Unreachable, "No answer within 90 seconds.", "WMI");
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            result = ClusterQueryResult.Error(ClusterQueryStatus.Failed, ex.Message, "WMI");
+        }
+        finally
+        {
+            if (ReferenceEquals(_clusterCts, cts))
+                IsClusterBusy = false;
+        }
+
+        if (!ReferenceEquals(_clusterCts, cts))
+            return;
+
+        if (!result.Succeeded)
+        {
+            ClusterMessage = ClusterExpansion.Describe(result, host);
+            ClusterMessageIsError = true;
+            return;
+        }
+
+        var candidates = ClusterExpansion.Candidates(host, result.Nodes, _workspace.Machines.Select(machine => machine.Host));
+        foreach (var candidate in candidates)
+            ClusterNodes.Add(new ClusterNodeRowViewModel(this, candidate));
+        _foundClusterName = result.ClusterName;
+        _foundClusterHost = host;
+        var already = candidates.Count(candidate => candidate.AlreadyAdded);
+        ClusterMessage = ClusterExpansion.Describe(result, host)
+            + (already > 0 ? " " + already + " already in the list." : "")
+            + " Untick any node you do not want.";
+        ClusterMessageIsError = false;
+        OnPropertyChanged(nameof(HasClusterNodes));
+        OnClusterNodeToggled();
+    }
+
+    public void AddClusterNodes(string password)
+    {
+        var host = NewHost?.Trim() ?? "";
+        if (!CheckCredentialInput(host))
+            return;
+        var hosts = ClusterNodes.Where(node => node.IsChecked && !node.AlreadyAdded).Select(node => node.Host).ToList();
+        if (hosts.Count == 0)
+        {
+            ClusterMessage = "Tick at least one node that is not in the list yet.";
+            ClusterMessageIsError = true;
+            return;
+        }
+
+        var clusterName = _foundClusterName is null ? null : MachineHost.ShortName(_foundClusterName);
+        var added = AddTargets(hosts, null, clusterName, password);
+        var skipped = hosts.Count - added.Count;
+        FinishAdd(added);
+        Banner = "Added " + added.Count + (added.Count == 1 ? " node" : " nodes")
+            + (clusterName is null ? "" : " from cluster " + clusterName)
+            + (skipped > 0 ? " (" + skipped + " already in the list)." : ".");
+    }
+
+    private bool CheckCredentialInput(string host)
+    {
+        if (UseAlternateCredential && !MachineHost.IsLocal(host) && string.IsNullOrWhiteSpace(NewUserName))
+        {
+            Banner = "Enter a user name for the alternate credentials.";
+            if (AddAsCluster)
+            {
+                ClusterMessage = Banner;
+                ClusterMessageIsError = true;
+            }
+
+            return false;
+        }
+
+        return true;
+    }
+
+    private List<MachineTarget> AddTargets(IReadOnlyList<string> hosts, string? customName, string? cluster, string password)
+    {
         var added = new List<MachineTarget>();
         foreach (var item in hosts)
         {
-            var existing = _workspace.Machines.FirstOrDefault(machine => MachineHost.SameHost(machine.Host, item));
-            if (existing is not null)
+            if (_workspace.Machines.Any(machine => MachineHost.SameHost(machine.Host, item)))
                 continue;
 
             var target = new MachineTarget
             {
                 Id = Ids.New("m"),
                 Host = MachineHost.IsLocal(item) ? "." : item,
-                DisplayName = customName ?? MachineHost.Display(item, null),
+                DisplayName = (hosts.Count == 1 ? customName : null) ?? (cluster is null ? MachineHost.Display(item, null) : MachineHost.ShortName(item)),
+                Cluster = cluster,
                 Credential = new MachineCredential
                 {
                     Mode = UseAlternateCredential ? CredentialMode.Alternate : CredentialMode.Current,
@@ -548,32 +741,22 @@ public partial class MainViewModel : ObservableObject
             added.Add(target);
         }
 
+        return added;
+    }
+
+    private void FinishAdd(List<MachineTarget> added)
+    {
         if (RememberCredential && added.Count > 0)
             PersistCredentials();
 
         BindMachines();
         if (added.Count > 0)
             SelectedMachine = Machines.FirstOrDefault(machine => machine.Id == added[^1].Id);
-        else if (_workspace.Machines.FirstOrDefault(machine => MachineHost.SameHost(machine.Host, host)) is { } already)
-        {
-            Banner = MachineHost.Display(already.Host, already.DisplayName) + " is already in the list.";
-            SelectedMachine = Machines.FirstOrDefault(machine => machine.Id == already.Id);
-            return;
-        }
 
         NewHost = "";
         NewDisplayName = "";
         NewUserName = "";
         IsAddMachineOpen = false;
-        if (lookup is not null && ClusterExpansion.IsClusterName(host, lookup) && added.Count > 0)
-        {
-            var skipped = hosts.Count - added.Count;
-            Banner = "Added " + added.Count + (added.Count == 1 ? " node" : " nodes")
-                + " from cluster " + lookup.ClusterName
-                + (skipped > 0 ? " (" + skipped + " already in the list)." : ".");
-        }
-        else if (lookup is null || !ClusterExpansion.IsClusterName(host, lookup))
-            Banner = string.IsNullOrEmpty(Banner) || Banner.StartsWith("Checking ", StringComparison.Ordinal) ? "" : Banner;
     }
 
     public void OpenWorkspace(string path)
@@ -1009,7 +1192,8 @@ public partial class MainViewModel : ObservableObject
                 machine.Host,
                 machine.DisplayName,
                 machine.Credential.Mode == CredentialMode.Alternate,
-                machine.Credential.UserName));
+                machine.Credential.UserName,
+                machine.Cluster));
         }
 
         SelectedMachine = Machines.FirstOrDefault(machine => machine.Id == selected) ?? Machines.FirstOrDefault();
@@ -1070,8 +1254,9 @@ public partial class MainViewModel : ObservableObject
 
 public partial class MachineItemViewModel : ObservableObject
 {
-    public MachineItemViewModel(string id, string host, string displayName, bool useAlternate, string? userName)
+    public MachineItemViewModel(string id, string host, string displayName, bool useAlternate, string? userName, string? cluster = null)
     {
+        Cluster = string.IsNullOrWhiteSpace(cluster) ? null : cluster.Trim();
         Id = id;
         Host = host;
         DisplayName = displayName;
@@ -1084,10 +1269,38 @@ public partial class MachineItemViewModel : ObservableObject
     public string DisplayName { get; }
     public bool UseAlternate { get; }
     public string UserName { get; }
+    public string? Cluster { get; }
+    public string HostLine => Cluster is null ? Host : Host + "  ·  cluster " + Cluster;
     public string CredentialText => UseAlternate ? (string.IsNullOrWhiteSpace(UserName) ? "Other user" : UserName) : "Current user";
     [ObservableProperty] private MachineStatus status = MachineStatus.Unknown;
     [ObservableProperty] private string statusText = "Idle";
     [ObservableProperty] private string detail = "";
+}
+
+public partial class ClusterNodeRowViewModel : ObservableObject
+{
+    private readonly MainViewModel _owner;
+
+    public ClusterNodeRowViewModel(MainViewModel owner, ClusterNodeCandidate candidate)
+    {
+        _owner = owner;
+        Host = candidate.Host;
+        ShortName = candidate.ShortName;
+        State = candidate.State;
+        AlreadyAdded = candidate.AlreadyAdded;
+        isChecked = !candidate.AlreadyAdded;
+    }
+
+    public string Host { get; }
+    public string ShortName { get; }
+    public string State { get; }
+    public bool AlreadyAdded { get; }
+    public bool CanToggle => !AlreadyAdded;
+    public string Note => AlreadyAdded ? "already added" : State;
+    public bool IsDown => !AlreadyAdded && State is "Down" or "Unknown";
+    [ObservableProperty] private bool isChecked;
+
+    partial void OnIsCheckedChanged(bool value) => _owner.OnClusterNodeToggled();
 }
 
 public partial class CounterRowViewModel : ObservableObject

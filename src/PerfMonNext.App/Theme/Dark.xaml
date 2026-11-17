@@ -12,6 +12,8 @@
   <SolidColorBrush x:Key="App.Muted" Color="#8B9CB0"/>
   <SolidColorBrush x:Key="App.Accent" Color="#4C9AFF"/>
   <SolidColorBrush x:Key="App.Selection" Color="#1D3B5C"/>
+  <SolidColorBrush x:Key="App.Error" Color="#F07178"/>
+  <SolidColorBrush x:Key="App.Warning" Color="#E6B450"/>
 
   <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#0E141B"/>
   <SolidColorBrush x:Key="{x:Static SystemColors.WindowTextBrushKey}" Color="#E8EEF5"/>
@@ -49,6 +51,11 @@
   </Style>
 
   <Style TargetType="CheckBox">
+    <Setter Property="Foreground" Value="{StaticResource App.Text}"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+  </Style>
+
+  <Style TargetType="RadioButton">
     <Setter Property="Foreground" Value="{StaticResource App.Text}"/>
     <Setter Property="VerticalAlignment" Value="Center"/>
   </Style>

@@ -18,7 +18,7 @@ PerfMon Next is an open-source Windows desktop app for watching performance coun
 - Make any chart taller or shorter by dragging its bottom edge (double-click the edge to reset); heights are saved with the workspace
 - Bulk work in the series table: multi-select rows, then **Hide**, **Show**, **Show only**, or **Remove** them (also on the right-click menu; **Space** toggles, **Delete** removes), or **Remove all** to start over with the same machines
 - Bulk selection in the picker: **All** / **None**, Shift-click ranges, **Ctrl+A**, and an instance filter
-- Type a **cluster name** in Add machine and every node of that failover cluster is added automatically
+- Add a single **server**, or a whole failover **cluster**: type the cluster name, pick from the discovered node list (all ticked by default), and every node is added and labelled with its cluster
 - Searchable counter picker with explain text, a built-in starter catalog, and **Add path** for pasted PerfMon-style paths
 - Several machines in one workspace, optional alternate credentials (passwords stay on this PC, never in the workspace file)
 - Workspace files you can save and reopen, CSV export/import, and import of Performance Monitor `.blg` logs
@@ -69,7 +69,16 @@ See the [user guide](docs/user-guide.md) for a walkthrough with screenshots.
 
 ## Adding remote machines
 
-Use **Add** in the Machines list. Host can be a computer name or IP address. `.` means this computer. If the name is a Windows failover cluster (for example an Azure Local or Hyper-V cluster name), PerfMon Next reads the cluster's node list and adds every node instead of the cluster name; a node name or an ordinary server is added as typed. The node list is read over WMI (`root\MSCluster`) with the same credentials. If it cannot be read, the typed host is added on its own and the status bar says why. **Test** reads `Memory\Available MBytes` and shows online, access denied, or offline on that row.
+Use **Add** in the Machines list and choose what you are adding:
+
+- **Server** — one computer by name or IP address. `.` means this computer. It is added exactly as typed.
+- **Cluster (all nodes)** — type a failover cluster name (for example an Azure Local or Hyper-V cluster), or the name of any of its nodes, and press **Find nodes**. PerfMon Next reads the node list and shows every node with its state (Up, Down, Paused) and a tick box, all ticked by default. Nodes that are already in the workspace are greyed out as *already added*. Press **Add N nodes** to add the ticked ones; they are labelled with the cluster name in the Machines list. If you typed a fully qualified cluster name (`clus.contoso.local`), short node names get the same DNS suffix so they resolve from a PC outside the domain.
+
+The node list is read over WMI/DCOM from the `root\MSCluster` namespace (classes `MSCluster_Cluster` and `MSCluster_Node`, packet privacy), so the FailoverClusters PowerShell module is **not** needed on your PC. If WMI fails for a reason other than access denied and the module is installed, the app falls back to `Get-ClusterNode -Cluster <name>` (signed-in user only). Errors are shown under the button: *access denied* (use an account that is a local administrator on the nodes), *not a failover cluster* (add it as a server instead), or *unreachable* (name/DNS, or WMI blocked by the firewall).
+
+Requirements for cluster discovery: an account with local administrator rights on the cluster nodes (a domain account in the cluster's admin group is typical), and the Windows Management Instrumentation (WMI-In / DCOM-In / RPC) firewall rules allowed on the nodes. Reading counters afterwards needs the usual Performance Monitor access (Remote Registry service and the *Performance Monitor Users* group or admin rights).
+
+**Test** reads `Memory\Available MBytes` and shows online, access denied, or offline on that row.
 
 The app reads as the signed-in user unless you tick **Different credentials**. The password is kept in memory for the session. **Remember on this PC** stores it with DPAPI under `%AppData%\PerfMonNext\credentials.json`. Workspace JSON never contains a password; if one is present it is ignored.
 

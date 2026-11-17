@@ -76,15 +76,79 @@
             <Border Background="{StaticResource App.Surface2}" CornerRadius="6" Padding="8" Margin="0,0,0,8"
                     Visibility="{Binding IsAddMachineOpen, Converter={StaticResource BoolVis}}">
               <StackPanel>
-                <TextBlock Text="Host (. for this computer)" Foreground="{StaticResource App.Muted}" FontSize="11"/>
-                <TextBox Text="{Binding NewHost, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,0" ToolTip="Host name. Use . for this computer."/>
-                <TextBlock Text="Display name" Foreground="{StaticResource App.Muted}" FontSize="11" Margin="0,6,0,0"/>
-                <TextBox Text="{Binding NewDisplayName, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,0"/>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                  <RadioButton Content="Server" GroupName="AddKind" IsChecked="{Binding AddAsServer}" Margin="0,0,16,0"
+                               ToolTip="Add one computer by name or IP address."/>
+                  <RadioButton Content="Cluster (all nodes)" GroupName="AddKind" IsChecked="{Binding AddAsCluster}"
+                               ToolTip="Type a failover cluster name (or any node). PerfMon Next reads the node list over WMI and lets you pick the nodes to add."/>
+                </StackPanel>
+                <TextBlock Text="Host (. for this computer)" Foreground="{StaticResource App.Muted}" FontSize="11" Visibility="{Binding AddAsServer, Converter={StaticResource BoolVis}}"/>
+                <TextBlock Text="Cluster name (or any node of the cluster)" Foreground="{StaticResource App.Muted}" FontSize="11" Visibility="{Binding AddAsCluster, Converter={StaticResource BoolVis}}"/>
+                <TextBox Text="{Binding NewHost, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,0" ToolTip="Host or cluster name. Use . for this computer."/>
+                <StackPanel Visibility="{Binding AddAsServer, Converter={StaticResource BoolVis}}">
+                  <TextBlock Text="Display name" Foreground="{StaticResource App.Muted}" FontSize="11" Margin="0,6,0,0"/>
+                  <TextBox Text="{Binding NewDisplayName, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,0"/>
+                </StackPanel>
                 <CheckBox Content="Different credentials" IsChecked="{Binding UseAlternateCredential}" Margin="0,6,0,0"/>
                 <TextBox Text="{Binding NewUserName, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,0" ToolTip="DOMAIN\user" Visibility="{Binding UseAlternateCredential, Converter={StaticResource BoolVis}}"/>
                 <PasswordBox x:Name="MachinePassword" Margin="0,6,0,0" ToolTip="Password is kept for this session, not in the workspace file." Visibility="{Binding UseAlternateCredential, Converter={StaticResource BoolVis}}"/>
                 <CheckBox Content="Remember on this PC" IsChecked="{Binding RememberCredential}" Margin="0,6,0,0" Visibility="{Binding UseAlternateCredential, Converter={StaticResource BoolVis}}"/>
-                <Button Content="Add machine" Style="{StaticResource PrimaryButton}" Margin="0,8,0,0" HorizontalAlignment="Left" Click="AddMachine_Click"/>
+                <Button Content="{Binding AddButtonText}" Style="{StaticResource PrimaryButton}" Margin="0,8,0,0" HorizontalAlignment="Left" Click="AddMachine_Click"
+                        IsEnabled="{Binding IsClusterBusy, Converter={StaticResource InverseBool}}"/>
+                <StackPanel Visibility="{Binding AddAsCluster, Converter={StaticResource BoolVis}}">
+                  <TextBlock Text="{Binding ClusterMessage}" TextWrapping="Wrap" FontSize="11" Margin="0,6,0,0">
+                    <TextBlock.Style>
+                      <Style TargetType="TextBlock">
+                        <Setter Property="Foreground" Value="{StaticResource App.Muted}"/>
+                        <Style.Triggers>
+                          <DataTrigger Binding="{Binding ClusterMessageIsError}" Value="True">
+                            <Setter Property="Foreground" Value="{StaticResource App.Error}"/>
+                          </DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </TextBlock.Style>
+                  </TextBlock>
+                  <StackPanel Visibility="{Binding HasClusterNodes, Converter={StaticResource BoolVis}}">
+                    <DockPanel Margin="0,6,0,2">
+                      <TextBlock Text="Nodes" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                      <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Content="All" Style="{StaticResource QuietButton}" Command="{Binding SelectAllClusterNodesCommand}" Padding="8,2" Margin="0"/>
+                        <Button Content="None" Style="{StaticResource QuietButton}" Command="{Binding SelectNoClusterNodesCommand}" Padding="8,2" Margin="6,0,0,0"/>
+                      </StackPanel>
+                    </DockPanel>
+                    <ItemsControl ItemsSource="{Binding ClusterNodes}" MaxHeight="150">
+                      <ItemsControl.Template>
+                        <ControlTemplate TargetType="ItemsControl">
+                          <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <ItemsPresenter/>
+                          </ScrollViewer>
+                        </ControlTemplate>
+                      </ItemsControl.Template>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                          <DockPanel Margin="0,2">
+                            <TextBlock DockPanel.Dock="Right" Text="{Binding Note}" FontSize="11" VerticalAlignment="Center" Margin="8,0,0,0">
+                              <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                  <Setter Property="Foreground" Value="{StaticResource App.Muted}"/>
+                                  <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsDown}" Value="True">
+                                      <Setter Property="Foreground" Value="{StaticResource App.Warning}"/>
+                                    </DataTrigger>
+                                  </Style.Triggers>
+                                </Style>
+                              </TextBlock.Style>
+                            </TextBlock>
+                            <CheckBox IsChecked="{Binding IsChecked}" IsEnabled="{Binding CanToggle}" ToolTip="{Binding Host}">
+                              <TextBlock Text="{Binding Host}" TextTrimming="CharacterEllipsis"/>
+                            </CheckBox>
+                          </DockPanel>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Button Content="{Binding AddClusterNodesText}" Style="{StaticResource PrimaryButton}" Margin="0,8,0,0" HorizontalAlignment="Left" Click="AddClusterNodes_Click"/>
+                  </StackPanel>
+                </StackPanel>
               </StackPanel>
             </Border>
             <ListBox ItemsSource="{Binding Machines}" SelectedItem="{Binding SelectedMachine}" MaxHeight="160" Margin="0,0,0,6">
@@ -99,7 +163,7 @@
                     <Ellipse Width="8" Height="8" Fill="{Binding Status, Converter={StaticResource StatusBrush}}" VerticalAlignment="Center"/>
                     <StackPanel Grid.Column="1" Margin="8,0,0,0">
                       <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold"/>
-                      <TextBlock Text="{Binding Host}" Foreground="{StaticResource App.Muted}" FontSize="11"/>
+                      <TextBlock Text="{Binding HostLine}" Foreground="{StaticResource App.Muted}" FontSize="11" TextTrimming="CharacterEllipsis"/>
                     </StackPanel>
                     <TextBlock Grid.Column="2" Text="{Binding StatusText}" Foreground="{StaticResource App.Muted}" FontSize="11" VerticalAlignment="Center"/>
                   </Grid>
