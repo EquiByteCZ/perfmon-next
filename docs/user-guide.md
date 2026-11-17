@@ -56,6 +56,12 @@ Select several rows with Shift-click or Ctrl-click (or **Ctrl+A**), then use the
 
 Keys in the table: **Space** toggles the selection (if any selected series is visible, they are all hidden; otherwise they are all shown) and **Delete** removes it. Click the color swatch to cycle a series color, and type into **Scale** to set a display factor (see [Fit scales and Reset](#fit-scales-and-reset)).
 
+### About
+
+![About window](screenshots/about.png)
+
+**About** shows the version and commit, the MIT license, a link to the source on GitHub, and who builds PerfMon Next.
+
 ## Counter picker
 
 ![Counter picker](screenshots/counter-picker.png)
