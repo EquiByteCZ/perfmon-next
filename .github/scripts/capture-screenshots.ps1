@@ -23,6 +23,7 @@ public static class NativeShot {
     public const uint SWP_SHOWWINDOW = 0x0040;
 
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+    [DllImport("user32.dll")] public static extern bool SetCursorPos(int X, int Y);
     [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
     [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
     [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr hWnd, IntPtr hdcBlt, uint nFlags);
@@ -152,11 +153,31 @@ try {
     # Default workspace already has Processor / Memory / Queue on this computer.
     [System.Windows.Forms.SendKeys]::SendWait("{F5}")
     Write-Log "Sent F5 to start sampling"
-    Start-Sleep -Seconds 8
+    Start-Sleep -Seconds 15
 
     $chartPath = Join-Path $OutputDir "main-window-live-chart.png"
     [NativeShot]::Capture($hwnd, $chartPath)
     Write-Log "Wrote $chartPath"
+
+    # Hover: park the mouse on the first chart so the crosshair and value card show.
+    try {
+        $r = New-Object NativeShot+RECT
+        [NativeShot]::GetWindowRect($hwnd, [ref]$r) | Out-Null
+        $hx = $r.Left + [int](($r.Right - $r.Left) * 0.80)
+        $hy = $r.Top + 270
+        [NativeShot]::SetCursorPos($hx - 40, $hy) | Out-Null
+        Start-Sleep -Milliseconds 300
+        [NativeShot]::SetCursorPos($hx, $hy) | Out-Null
+        Start-Sleep -Milliseconds 1500
+        $hoverPath = Join-Path $OutputDir "hover-tooltip.png"
+        [NativeShot]::CaptureScreen($hwnd, $hoverPath)
+        Write-Log "Wrote $hoverPath (cursor at $hx,$hy)"
+    } catch {
+        Write-Log "Hover capture failed: $_"
+    } finally {
+        [NativeShot]::SetCursorPos(5, 5) | Out-Null
+        Start-Sleep -Milliseconds 300
+    }
 
     $pickerOk = $false
     try {

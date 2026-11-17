@@ -7,7 +7,7 @@
     <RootNamespace>PerfMonNext</RootNamespace>
     <AssemblyName>PerfMonNext</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>0.3.3</Version>
+    <Version>0.3.4</Version>
     <Product>PerfMon Next</Product>
     <Description>Multi-machine Windows performance counter monitor.</Description>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>

@@ -8,13 +8,28 @@ public sealed class EncodedSeries
     public required double[] Xs { get; init; }
     public required double[] Ys { get; init; }
 
+    /// <summary>Full series name for tooltips (Legend may be blank when the legend is capped).</summary>
+    public string Name { get; init; } = "";
+
+    /// <summary>Display factor applied to Ys; divide by it for real values.</summary>
+    public double Scale { get; init; } = 1;
+
+    public string Unit { get; init; } = "";
+
+    /// <summary>"last 1.2M · max 3.4M" in real units, shown after the legend label.</summary>
+    public string LegendDetail { get; init; } = "";
+
     public EncodedSeries WithoutLegend() => new()
     {
         Key = Key,
         Legend = "",
         Color = Color,
         Xs = Xs,
-        Ys = Ys
+        Ys = Ys,
+        Name = Name,
+        Scale = Scale,
+        Unit = Unit,
+        LegendDetail = ""
     };
 }
 
@@ -59,12 +74,7 @@ public static class ChartFrames
         if (visible.Count == 0)
             return [];
 
-        IEnumerable<IGrouping<string, SeriesSnapshot>> groups = grouping switch
-        {
-            ChartGrouping.Combined => visible.GroupBy(_ => "All counters"),
-            ChartGrouping.ByMachine => visible.GroupBy(item => item.MachineDisplay, StringComparer.OrdinalIgnoreCase),
-            _ => visible.GroupBy(item => item.Path.Category + " · " + item.Path.Counter, StringComparer.OrdinalIgnoreCase)
-        };
+        var groups = visible.GroupBy(item => GroupKey(item, grouping), StringComparer.OrdinalIgnoreCase);
 
         var frames = new List<ChartFrame>();
         foreach (var group in groups.OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase))
@@ -112,22 +122,7 @@ public static class ChartFrames
             }
 
             if (yMin is double low && yMax is double high)
-            {
-                if (high <= low)
-                {
-                    low -= 1;
-                    high += 1;
-                }
-                else
-                {
-                    var pad = (high - low) * 0.08;
-                    low -= pad;
-                    high += pad;
-                }
-
-                yMin = low;
-                yMax = high;
-            }
+                (yMin, yMax) = YRange.For(low, high);
 
             var keyPrefix = grouping switch
             {
@@ -152,6 +147,25 @@ public static class ChartFrames
         return frames;
     }
 
+    public static string GroupKey(SeriesSnapshot item, ChartGrouping grouping) => grouping switch
+    {
+        ChartGrouping.Combined => "All counters",
+        ChartGrouping.ByMachine => item.MachineDisplay,
+        _ => item.Path.Category + " · " + item.Path.Counter
+    };
+
+    public static string Detail(SeriesSnapshot snapshot, string unit)
+    {
+        if (snapshot.Stats.Last is null && snapshot.Stats.Max is null)
+            return "";
+        var parts = new List<string>();
+        if (snapshot.Stats.Last is double l)
+            parts.Add("last " + CompactFormat.Format(l) + (unit is "%" ? "%" : ""));
+        if (snapshot.Stats.Max is double m)
+            parts.Add("max " + CompactFormat.Format(m) + (unit is "%" ? "%" : ""));
+        return string.Join(" · ", parts);
+    }
+
     public static EncodedSeries Encode(SeriesSnapshot snapshot, string legend)
     {
         var xs = new double[snapshot.Samples.Count];
@@ -163,13 +177,18 @@ public static class ChartFrames
             ys[i] = sample.Value is double value && double.IsFinite(value) ? value * snapshot.Scale : double.NaN;
         }
 
+        var unit = CompactFormat.UnitFor(snapshot.Path.Counter);
         return new EncodedSeries
         {
             Key = snapshot.Key,
-            Legend = legend,
+            Legend = legend.Length == 0 ? "" : legend + ScaleFormat.Suffix(snapshot.Scale),
             Color = snapshot.Color,
             Xs = xs,
-            Ys = ys
+            Ys = ys,
+            Name = legend.Length == 0 ? snapshot.MachineDisplay : legend,
+            Scale = snapshot.Scale,
+            Unit = unit,
+            LegendDetail = Detail(snapshot, unit)
         };
     }
 

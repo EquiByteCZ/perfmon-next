@@ -48,8 +48,9 @@
         <ComboBox Width="90" ItemsSource="{Binding WindowChoices}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding WindowSeconds}" Margin="0,0,12,0"/>
         <CheckBox Content="Follow" IsChecked="{Binding FollowLive}" Margin="0,0,12,0" ToolTip="Keep the time axis on the latest samples. Turn off to pan and zoom."/>
         <CheckBox Content="Legend" IsChecked="{Binding ShowLegend}" Margin="0,0,12,0" ToolTip="Show a compact chart legend. Uncheck to hide it on every chart; series table colors stay visible."/>
-        <Button Content="Fit scales" Style="{StaticResource QuietButton}" Command="{Binding FitScalesCommand}" ToolTip="Pick a power-of-ten scale so each series sits near 10–100."/>
-        <Button Content="Reset" Style="{StaticResource QuietButton}" Command="{Binding ResetViewCommand}" ToolTip="Reset zoom and pan on every chart and turn Follow back on."/>
+        <Button Content="Fit scales" Style="{StaticResource QuietButton}" Command="{Binding FitScalesCommand}"
+                ToolTip="For charts that mix big and small series: magnifies the smaller ones by a power of ten (×10, ×1000…) so they are visible next to the largest, which stays ×1. The factor shows in the Scale column and legend; hover values stay real. A chart with one series is not changed."/>
+        <Button Content="Reset" Style="{StaticResource QuietButton}" Command="{Binding ResetViewCommand}" ToolTip="Back to the default view: every scale ×1, every series shown, zoom and pan cleared (Y from 0), Follow on. Series are kept."/>
       </WrapPanel>
     </Border>
 
@@ -292,7 +293,20 @@
                 <DataGridTextColumn Header="Min" Binding="{Binding Minimum}" IsReadOnly="True" Width="80"/>
                 <DataGridTextColumn Header="Max" Binding="{Binding Maximum}" IsReadOnly="True" Width="80"/>
                 <DataGridTextColumn Header="Avg" Binding="{Binding Average}" IsReadOnly="True" Width="80"/>
-                <DataGridTextColumn Header="Scale" Binding="{Binding Scale, UpdateSourceTrigger=LostFocus, StringFormat=0.####}" Width="70"/>
+                <DataGridTextColumn Header="Scale" Binding="{Binding ScaleText, UpdateSourceTrigger=LostFocus}" Width="70">
+                  <DataGridTextColumn.ElementStyle>
+                    <Style TargetType="TextBlock">
+                      <Setter Property="Foreground" Value="{StaticResource App.Muted}"/>
+                      <Setter Property="ToolTip" Value="Display factor for the chart only. Table, hover, and CSV show real values. Type e.g. 0.001 or 1e-6."/>
+                      <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsScaled}" Value="True">
+                          <Setter Property="Foreground" Value="{StaticResource App.Accent}"/>
+                          <Setter Property="FontWeight" Value="SemiBold"/>
+                        </DataTrigger>
+                      </Style.Triggers>
+                    </Style>
+                  </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
                 <DataGridTemplateColumn Width="74">
                   <DataGridTemplateColumn.CellTemplate>
                     <DataTemplate>

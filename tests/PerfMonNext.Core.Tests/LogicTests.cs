@@ -223,7 +223,7 @@ public sealed class SeriesTests
     }
 
     [Fact]
-    public void Scale_override_changes_displayed_stats_but_not_raw_max()
+    public void Scale_override_keeps_table_stats_in_real_units_and_scales_only_the_chart()
     {
         var workspace = WorkspaceFactory.CreateNew();
         workspace.Counters.Clear();
@@ -235,8 +235,10 @@ public sealed class SeriesTests
         var key = SeriesIdentity.OverrideKey(".", path);
         workspace.ScaleOverrides[key] = 0.001;
         var snapshot = Assert.Single(store.Snapshot(workspace, null));
-        Assert.Equal(2.048, snapshot.Stats.Last!.Value, 3);
+        Assert.Equal(2048, snapshot.Stats.Last!.Value, 3);
         Assert.Equal(2048, snapshot.Stats.RawMaxAbs);
+        Assert.Equal(0.001, snapshot.Scale);
+        Assert.Equal(2.048, ChartFrames.Encode(snapshot, "m").Ys[0], 6);
         Assert.Equal(1e-5, ScaleSuggester.Suggest(5_000_000), 8);
         Assert.Equal(1, ScaleSuggester.Suggest(80));
         Assert.Equal(0.1, ScaleSuggester.Suggest(250));

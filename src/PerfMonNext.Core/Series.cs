@@ -284,7 +284,7 @@ public sealed class SeriesStore
                 Scale = scale,
                 Visible = visible,
                 Samples = samples,
-                Stats = SeriesStats.FromSamples(samples, scale),
+                Stats = SeriesStats.FromSamples(samples, 1),
                 LastError = tracked.LastError
             });
             paletteIndex++;

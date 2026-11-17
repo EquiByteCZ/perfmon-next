@@ -354,21 +354,35 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void ResetView()
     {
+        // Back to the default view: every scale ×1, every series shown, auto zoom (Y from 0), following live.
+        // Series and machines are kept.
+        _workspace.ScaleOverrides.Clear();
+        _workspace.Visibility.Clear();
         FollowLive = true;
         RefreshPresentation();
+        Banner = "View reset: all scales ×1, all series shown, charts back to live auto-zoom.";
     }
 
     [RelayCommand]
     private void FitScales()
     {
-        foreach (var snapshot in _last)
+        var plan = ScaleFitter.Fit(_last, _workspace.ChartGrouping);
+        var scaled = 0;
+        foreach (var (key, factor) in plan)
         {
-            if (snapshot.Stats.RawMaxAbs is not double max)
-                continue;
-            _workspace.ScaleOverrides[snapshot.OverrideKey] = ScaleSuggester.Suggest(max);
+            if (ScaleFormat.IsIdentity(factor))
+                _workspace.ScaleOverrides.Remove(key);
+            else
+            {
+                _workspace.ScaleOverrides[key] = factor;
+                scaled++;
+            }
         }
 
         RefreshPresentation();
+        Banner = scaled == 0
+            ? "Fit scales: nothing to fit. Each chart's series are already within 10× of each other (a single series always stays ×1)."
+            : "Fit scales: magnified " + scaled + " smaller series; see ×factor in the Scale column and legend. Hover shows real values. Reset sets all back to ×1.";
     }
 
     [RelayCommand]
@@ -1110,6 +1124,8 @@ public partial class SeriesRowViewModel : ObservableObject
     [ObservableProperty] private string maximum = "—";
     [ObservableProperty] private string average = "—";
     [ObservableProperty] private double scale = 1;
+    [ObservableProperty] private string scaleText = "1";
+    [ObservableProperty] private bool isScaled;
 
     public void Apply(SeriesSnapshot snapshot)
     {
@@ -1127,6 +1143,8 @@ public partial class SeriesRowViewModel : ObservableObject
         Maximum = ValueFormat.Format(snapshot.Stats.Max);
         Average = ValueFormat.Format(snapshot.Stats.Average);
         Scale = snapshot.Scale;
+        ScaleText = ScaleFormat.Format(snapshot.Scale);
+        IsScaled = !ScaleFormat.IsIdentity(snapshot.Scale);
         RowTip = string.IsNullOrWhiteSpace(snapshot.LastError) ? "" : snapshot.LastError;
         _suspend = false;
     }
@@ -1135,6 +1153,14 @@ public partial class SeriesRowViewModel : ObservableObject
     {
         if (!_suspend && !string.IsNullOrEmpty(OverrideKey))
             _owner.SetScale(OverrideKey, value);
+    }
+
+    partial void OnScaleTextChanged(string value)
+    {
+        if (_suspend || string.IsNullOrEmpty(OverrideKey))
+            return;
+        if (ScaleFormat.TryParse(value, out var parsed))
+            _owner.SetScale(OverrideKey, parsed);
     }
 
     partial void OnVisibleChanged(bool value)
