@@ -78,6 +78,8 @@ The node list is read over WMI/DCOM from the `root\MSCluster` namespace (classes
 
 Requirements for cluster discovery: an account with local administrator rights on the cluster nodes (a domain account in the cluster's admin group is typical), and the Windows Management Instrumentation (WMI-In / DCOM-In / RPC) firewall rules allowed on the nodes. Reading counters afterwards needs the usual Performance Monitor access (Remote Registry service and the *Performance Monitor Users* group or admin rights).
 
+![Add a cluster](docs/screenshots/add-cluster.png)
+
 **Test** reads `Memory\Available MBytes` and shows online, access denied, or offline on that row.
 
 The app reads as the signed-in user unless you tick **Different credentials**. The password is kept in memory for the session. **Remember on this PC** stores it with DPAPI under `%AppData%\PerfMonNext\credentials.json`. Workspace JSON never contains a password; if one is present it is ignored.
