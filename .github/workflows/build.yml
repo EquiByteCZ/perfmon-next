@@ -140,3 +140,24 @@ jobs:
           } else {
             gh release create $tag artifacts/PerfMonNext-win-x64.zip --repo $env:GITHUB_REPOSITORY --title "PerfMon Next $tag" --notes $notes --verify-tag
           }
+
+  # Submits the new version to microsoft/winget-pkgs. OFF until the repository variable
+  # WINGET_ENABLED is set to "true" and a classic PAT (public_repo) is stored as the
+  # WINGET_TOKEN secret of the "release" environment. Needs the package to exist in winget-pkgs first.
+  winget:
+    if: startsWith(github.ref, 'refs/tags/v') && vars.WINGET_ENABLED == 'true'
+    needs: [release]
+    runs-on: windows-latest
+    environment: release
+    permissions:
+      contents: read
+    steps:
+      - name: Submit to winget-pkgs
+        shell: pwsh
+        env:
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart('v')
+          $url = "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/PerfMonNext-win-x64.zip"
+          Invoke-WebRequest https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
+          .\wingetcreate.exe update EquiByte.PerfMonNext --version $version --urls "$url|x64" --submit --token $env:WINGET_TOKEN
