@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:views="clr-namespace:PerfMonNext.Views"
         Title="{Binding WindowTitle}"
+        Icon="/Assets/app.ico"
         Width="1440" Height="920" MinWidth="1100" MinHeight="700"
         Background="{StaticResource App.Background}">
   <Window.InputBindings>

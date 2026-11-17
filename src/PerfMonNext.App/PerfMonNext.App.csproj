@@ -7,6 +7,7 @@
     <RootNamespace>PerfMonNext</RootNamespace>
     <AssemblyName>PerfMonNext</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <Version>0.3.5</Version>
     <Company>EquiByte s.r.o.</Company>
     <Copyright>Copyright (c) 2026 EquiByte s.r.o. MIT License.</Copyright>
@@ -24,5 +25,7 @@
   </ItemGroup>
   <ItemGroup>
     <Resource Include="Assets\equibyte-logo.png" />
+    <Resource Include="Assets\equibyte-mark.png" />
+    <Resource Include="Assets\app.ico" />
   </ItemGroup>
 </Project>
