@@ -24,6 +24,7 @@ public static class NativeShot {
 
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
     [DllImport("user32.dll")] public static extern bool SetCursorPos(int X, int Y);
+    [DllImport("user32.dll")] public static extern void mouse_event(uint dwFlags, int dx, int dy, uint dwData, UIntPtr dwExtraInfo);
     [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
     [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
     [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr hWnd, IntPtr hdcBlt, uint nFlags);
@@ -174,6 +175,48 @@ try {
         Write-Log "Wrote $hoverPath (cursor at $hx,$hy)"
     } catch {
         Write-Log "Hover capture failed: $_"
+    } finally {
+        [NativeShot]::SetCursorPos(5, 5) | Out-Null
+        Start-Sleep -Milliseconds 300
+    }
+
+    # Chart resize: drag the first chart's bottom handle down, capture, then double-click it to reset.
+    try {
+        $root = Get-AutomationWindow $hwnd
+        $thumb = $root.FindFirst([System.Windows.Automation.TreeScope]::Descendants,
+            (New-Object System.Windows.Automation.PropertyCondition ([System.Windows.Automation.AutomationElement]::NameProperty, "Resize chart")))
+        if ($thumb) {
+            $b = $thumb.Current.BoundingRectangle
+            $tx = [int]($b.X + $b.Width / 2); $ty = [int]($b.Y + $b.Height / 2)
+            [NativeShot]::SetCursorPos($tx, $ty) | Out-Null
+            Start-Sleep -Milliseconds 300
+            [NativeShot]::mouse_event(0x0002, 0, 0, 0, [UIntPtr]::Zero)
+            for ($i = 1; $i -le 20; $i++) {
+                [NativeShot]::SetCursorPos($tx, $ty + $i * 9) | Out-Null
+                Start-Sleep -Milliseconds 30
+            }
+            [NativeShot]::mouse_event(0x0004, 0, 0, 0, [UIntPtr]::Zero)
+            [NativeShot]::SetCursorPos($tx, $ty + 180) | Out-Null
+            Start-Sleep -Milliseconds 1200
+            $resizePath = Join-Path $OutputDir "chart-resize.png"
+            [NativeShot]::CaptureScreen($hwnd, $resizePath)
+            Write-Log "Wrote $resizePath (dragged handle from $tx,$ty by 180 px)"
+            $b2 = $thumb.Current.BoundingRectangle
+            Write-Log ("Resize handle moved from y={0} to y={1}" -f [int]$b.Y, [int]$b2.Y)
+            [NativeShot]::SetCursorPos([int]($b2.X + $b2.Width / 2), [int]($b2.Y + $b2.Height / 2)) | Out-Null
+            Start-Sleep -Milliseconds 200
+            foreach ($k in 1..2) {
+                [NativeShot]::mouse_event(0x0002, 0, 0, 0, [UIntPtr]::Zero)
+                [NativeShot]::mouse_event(0x0004, 0, 0, 0, [UIntPtr]::Zero)
+                Start-Sleep -Milliseconds 60
+            }
+            Start-Sleep -Milliseconds 800
+            Write-Log ("After double-click the handle is at y={0}" -f [int]$thumb.Current.BoundingRectangle.Y)
+        } else {
+            Write-Log "Resize handle not found."
+        }
+    } catch {
+        Write-Log "Resize capture failed: $_"
     } finally {
         [NativeShot]::SetCursorPos(5, 5) | Out-Null
         Start-Sleep -Milliseconds 300

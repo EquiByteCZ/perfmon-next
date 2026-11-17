@@ -15,6 +15,7 @@ PerfMon Next is an open-source Windows desktop app for watching performance coun
 - Grafana-style charts: a crosshair with a hover card showing the time and every series' real value (K/M/G with units), a Y axis that starts at 0, compact K/M/G ticks, and a legend with last and max
 - Compact chart legend (up to 6 entries plus "+N more") that you can switch off, a readable time axis, and **Reset** to put every chart back to the default view
 - Hover anywhere on a chart for the exact values; the card hides when you point at a gap with no samples
+- Make any chart taller or shorter by dragging its bottom edge (double-click the edge to reset); heights are saved with the workspace
 - Bulk work in the series table: multi-select rows, then **Hide**, **Show**, **Show only**, or **Remove** them (also on the right-click menu; **Space** toggles, **Delete** removes), or **Remove all** to start over with the same machines
 - Bulk selection in the picker: **All** / **None**, Shift-click ranges, **Ctrl+A**, and an instance filter
 - Type a **cluster name** in Add machine and every node of that failover cluster is added automatically

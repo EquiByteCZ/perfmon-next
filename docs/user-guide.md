@@ -28,13 +28,19 @@ The Y axis starts at 0 for counters that never go negative, with a little headro
 
 Point at a chart and a dashed crosshair follows the mouse. A card shows the sample time and, for every series on that chart, its color, name, and value at the nearest sample. Values are always real (never scaled). Numbers under 10,000 are shown in full; bigger ones are shown compactly, followed by the full number, for example `12.3M B/s (12,345,678)`. A unit is added when the counter name implies one (`B/s` for Bytes/sec, `%`, `MB`, `/s`). The card snaps to the nearest sample. A series is left out when its nearest sample is more than about two sample intervals away, so pointing at an empty part of the chart (for example before sampling started) shows no card.
 
+### Chart height
+
+![A chart made taller by dragging its bottom edge](screenshots/chart-resize.png)
+
+Every chart has a thin handle on its bottom edge (a short grip that turns blue on hover; the cursor becomes ↕). Drag it to make that chart taller or shorter; other charts keep their size. The smallest height is 140 px. When the charts no longer fit, the chart area scrolls. Double-click the handle to put that chart back to its default height. Chart heights are saved in the workspace file, and **Reset** puts every chart back to the default height.
+
 ### Fit scales and Reset
 
 Each series has a display **Scale** factor (default 1). It only changes how the line is drawn. The series table, the hover card, and CSV export always show real values.
 
 **Fit scales** is for charts that mix series of very different size, for example a busy and an idle network adapter in one chart. It magnifies the smaller series by a power of ten (×10, ×1000, …) so they are visible next to the largest one, which stays ×1 so the axis keeps real units. A chart with one series, or with series within 10× of each other, is not changed, and the status bar says so. A scaled series shows its factor in two places: the legend (for example `node01 ×1000`) and the highlighted **Scale** column. You can also type a factor there, such as `0.001` or `1e-6`.
 
-**Reset** puts everything back to the default view: every scale factor back to 1, every hidden series shown again, zoom and pan cleared (Y from 0 again), and **Follow** turned on. It does not remove series or machines.
+**Reset** puts everything back to the default view: every scale factor back to 1, every hidden series shown again, every chart back to its default height, zoom and pan cleared (Y from 0 again), and **Follow** turned on. It does not remove series or machines.
 
 **Legend** shows a compact legend to the right of each chart: up to six entries, each with its last and max value, then "+N more". Uncheck it to hide the legend on every chart; the colors stay visible in the series table.
 

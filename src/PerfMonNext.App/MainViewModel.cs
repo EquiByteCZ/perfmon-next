@@ -120,7 +120,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private CounterSetInfo? selectedSet;
     [ObservableProperty] private CounterRowViewModel? selectedCounter;
 
-    public double ChartItemHeight => Charts.Count <= 1 ? Math.Max(220, _chartViewportHeight) : 260;
+    public double ChartItemHeight => ChartSizing.Default(Charts.Count, _chartViewportHeight);
     public GridLength ChartRowHeight => ChartsVisible ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
     public GridLength SplitterRowHeight => ChartsVisible ? new GridLength(6) : new GridLength(0);
     public GridLength TableRowHeight => ChartsVisible ? new GridLength(230) : new GridLength(1, GridUnitType.Star);
@@ -135,6 +135,39 @@ public partial class MainViewModel : ObservableObject
             return;
         _chartViewportHeight = height;
         OnPropertyChanged(nameof(ChartItemHeight));
+        UpdateChartDefaults();
+    }
+
+    private void UpdateChartDefaults()
+    {
+        var height = ChartItemHeight;
+        foreach (var chart in Charts)
+            chart.DefaultHeight = height;
+    }
+
+    /// <summary>Live resize while the user drags a chart's bottom edge.</summary>
+    public void ResizeChart(ChartViewModel chart, double delta)
+    {
+        var height = ChartSizing.Drag(chart.DisplayHeight, delta);
+        chart.CustomHeight = height;
+        // Write through at once so the next refresh (which re-reads saved heights) does not snap it back mid-drag.
+        _workspace.ChartHeights[chart.Key] = height;
+    }
+
+    /// <summary>Remember the dragged height in the workspace so a saved workspace keeps it.</summary>
+    public void CommitChartHeight(ChartViewModel chart)
+    {
+        if (chart.CustomHeight is { } height)
+            _workspace.ChartHeights[chart.Key] = height;
+        else
+            _workspace.ChartHeights.Remove(chart.Key);
+    }
+
+    /// <summary>Double-click on the resize handle: back to the default height.</summary>
+    public void ResetChartHeight(ChartViewModel chart)
+    {
+        chart.CustomHeight = null;
+        _workspace.ChartHeights.Remove(chart.Key);
     }
 
     partial void OnWorkspaceNameChanged(string value)
@@ -358,6 +391,9 @@ public partial class MainViewModel : ObservableObject
         // Series and machines are kept.
         _workspace.ScaleOverrides.Clear();
         _workspace.Visibility.Clear();
+        _workspace.ChartHeights.Clear();
+        foreach (var chart in Charts)
+            chart.CustomHeight = null;
         FollowLive = true;
         RefreshPresentation();
         Banner = "View reset: all scales ×1, all series shown, charts back to live auto-zoom.";
@@ -780,6 +816,7 @@ public partial class MainViewModel : ObservableObject
             + " · " + Machines.Count + " machines · " + _last.Count + " series · " + online + " online"
             + (bad == 0 ? "" : " · " + bad + " not responding");
         OnPropertyChanged(nameof(ChartItemHeight));
+        UpdateChartDefaults();
     }
 
     private void SyncRows(IReadOnlyList<SeriesSnapshot> snapshots)
@@ -827,6 +864,7 @@ public partial class MainViewModel : ObservableObject
 
             chart.Title = frame.Title;
             chart.Frame = frame;
+            chart.CustomHeight = _workspace.ChartHeights.TryGetValue(frame.Key, out var saved) ? ChartSizing.Clamp(saved) : null;
         }
 
         for (var i = Charts.Count - 1; i >= 0; i--)
@@ -1176,4 +1214,17 @@ public partial class ChartViewModel : ObservableObject
     public string Key { get; }
     [ObservableProperty] private string title = "";
     [ObservableProperty] private ChartFrame? frame;
+
+    /// <summary>Height set by dragging the bottom edge; null means the default height.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DisplayHeight))]
+    [NotifyPropertyChangedFor(nameof(IsResized))]
+    private double? customHeight;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DisplayHeight))]
+    private double defaultHeight = ChartSizing.DefaultMultiHeight;
+
+    public double DisplayHeight => CustomHeight ?? DefaultHeight;
+    public bool IsResized => CustomHeight is not null;
 }

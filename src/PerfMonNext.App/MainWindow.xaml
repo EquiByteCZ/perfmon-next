@@ -212,12 +212,21 @@
               <ItemsControl ItemsSource="{Binding Charts}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate>
-                    <Border Height="{Binding DataContext.ChartItemHeight, RelativeSource={RelativeSource AncestorType=Window}}" Margin="0,0,0,8" Background="#10161D" CornerRadius="6">
-                      <DockPanel>
-                        <TextBlock DockPanel.Dock="Top" Text="{Binding Title}" Margin="10,8,10,0" FontWeight="SemiBold"/>
-                        <views:LiveChartView Frame="{Binding Frame}" FollowLive="{Binding DataContext.FollowLive, RelativeSource={RelativeSource AncestorType=Window}, Mode=TwoWay}"/>
-                      </DockPanel>
-                    </Border>
+                    <Grid Margin="0,0,0,4">
+                      <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="8"/>
+                      </Grid.RowDefinitions>
+                      <Border Height="{Binding DisplayHeight}" Background="#10161D" CornerRadius="6">
+                        <DockPanel>
+                          <TextBlock DockPanel.Dock="Top" Text="{Binding Title}" Margin="10,8,10,0" FontWeight="SemiBold"/>
+                          <views:LiveChartView Frame="{Binding Frame}" FollowLive="{Binding DataContext.FollowLive, RelativeSource={RelativeSource AncestorType=Window}, Mode=TwoWay}"/>
+                        </DockPanel>
+                      </Border>
+                      <Thumb Grid.Row="1" Style="{StaticResource ChartResizeThumb}" DragDelta="ChartResize_DragDelta" DragCompleted="ChartResize_DragCompleted"
+                             MouseDoubleClick="ChartResize_DoubleClick" AutomationProperties.Name="Resize chart"
+                             ToolTip="Drag to change this chart's height · double-click to reset"/>
+                    </Grid>
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>

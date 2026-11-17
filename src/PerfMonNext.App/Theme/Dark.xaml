@@ -371,6 +371,32 @@
     </Style.Triggers>
   </Style>
 
+  <!-- Bottom-edge handle that resizes one chart panel. A short grip is always visible; the full bar lights up on hover/drag. -->
+  <Style x:Key="ChartResizeThumb" TargetType="Thumb">
+    <Setter Property="Cursor" Value="SizeNS"/>
+    <Setter Property="Height" Value="8"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Thumb">
+          <Grid Background="Transparent">
+            <Border x:Name="Bar" Height="2" CornerRadius="1" Background="Transparent" Margin="6,0"/>
+            <Border x:Name="Grip" Width="36" Height="3" CornerRadius="1.5" Background="{StaticResource App.Border}" HorizontalAlignment="Center"/>
+          </Grid>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Bar" Property="Background" Value="{StaticResource App.Accent}"/>
+              <Setter TargetName="Grip" Property="Background" Value="{StaticResource App.Accent}"/>
+            </Trigger>
+            <Trigger Property="IsDragging" Value="True">
+              <Setter TargetName="Bar" Property="Background" Value="{StaticResource App.Accent}"/>
+              <Setter TargetName="Grip" Property="Background" Value="{StaticResource App.Accent}"/>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
   <Style TargetType="GridSplitter">
     <Setter Property="Background" Value="#1A2430"/>
   </Style>

@@ -119,6 +119,27 @@ public partial class MainWindow : Window
 
     private void ChartScroll_SizeChanged(object sender, SizeChangedEventArgs e) => _vm.SetChartViewport(e.NewSize.Height);
 
+    private void ChartResize_DragDelta(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is ChartViewModel chart)
+            _vm.ResizeChart(chart, e.VerticalChange);
+    }
+
+    private void ChartResize_DragCompleted(object sender, System.Windows.Controls.Primitives.DragCompletedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is ChartViewModel chart)
+            _vm.CommitChartHeight(chart);
+    }
+
+    private void ChartResize_DoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is ChartViewModel chart)
+        {
+            _vm.ResetChartHeight(chart);
+            e.Handled = true;
+        }
+    }
+
     private int _lastCounterIndex = -1;
     private int _lastInstanceIndex = -1;
 

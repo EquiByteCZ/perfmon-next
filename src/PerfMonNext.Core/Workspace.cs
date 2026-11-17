@@ -65,6 +65,8 @@ public sealed class Workspace
     public Dictionary<string, string> ColorOverrides { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, double> ScaleOverrides { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, bool> Visibility { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>Chart heights the user set by dragging a chart's bottom edge, keyed by chart key. Missing means default.</summary>
+    public Dictionary<string, double> ChartHeights { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
     [JsonIgnore]
     public TimeSpan? VisibleWindow => VisibleWindowSeconds <= 0 ? null : TimeSpan.FromSeconds(VisibleWindowSeconds);
@@ -109,6 +111,14 @@ public static class WorkspaceSanitizer
         var warnings = new List<string>();
         if (workspace.Version <= 0)
             workspace.Version = 1;
+
+        var heights = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, height) in workspace.ChartHeights ?? [])
+        {
+            if (!string.IsNullOrWhiteSpace(key) && !double.IsNaN(height) && !double.IsInfinity(height))
+                heights[key] = ChartSizing.Clamp(height);
+        }
+        workspace.ChartHeights = heights;
 
         if (workspace.SampleIntervalMs < MinIntervalMs)
         {
