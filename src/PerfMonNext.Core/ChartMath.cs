@@ -156,15 +156,18 @@ public static class CompactFormat
         return perSec ? "/s" : "";
     }
 
-    /// <summary>"12.3M B/s (12,345,678)" style text for tooltips; small numbers stay plain.</summary>
+    /// <summary>
+    /// Tooltip text: below 10,000 (and always for MB and %) the full number with separators, e.g. "4,960 MB";
+    /// larger values compact first, e.g. "12.3M B/s (12,345,678)".
+    /// </summary>
     public static string WithUnit(double value, string unit)
     {
         if (!double.IsFinite(value))
             return "—";
-        var compact = Format(value);
         var spacer = unit.Length == 0 || unit == "%" ? "" : " ";
-        var head = compact + spacer + unit;
-        return Math.Abs(value) >= 10_000 ? head + " (" + ValueFormat.Format(value) + ")" : head;
+        if (Math.Abs(value) < 10_000 || unit is "MB" or "%")
+            return ValueFormat.Format(value) + spacer + unit;
+        return Format(value) + spacer + unit + " (" + ValueFormat.Format(value) + ")";
     }
 }
 

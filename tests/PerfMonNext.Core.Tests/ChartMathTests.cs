@@ -109,6 +109,16 @@ public sealed class ChartMathTests
     public void Unit_hints(string counter, string unit) => Assert.Equal(unit, CompactFormat.UnitFor(counter));
 
     [Fact]
+    public void Tooltip_text_is_full_below_ten_thousand_and_compact_above()
+    {
+        Assert.Equal("4960 MB", CompactFormat.WithUnit(4960, "MB").Replace(",", "").Replace("\u00A0", "").Replace(" ", " "));
+        Assert.Equal("61.39%", CompactFormat.WithUnit(61.39, "%").Replace(',', '.'));
+        var big = CompactFormat.WithUnit(12_345_678, "B/s");
+        Assert.StartsWith("12", big);
+        Assert.Contains("M B/s (", big);
+    }
+
+    [Fact]
     public void Nearest_index_by_binary_search()
     {
         double[] xs = [1, 2, 3, 10];
