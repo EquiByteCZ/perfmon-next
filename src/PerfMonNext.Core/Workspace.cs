@@ -295,9 +295,12 @@ public static class WorkspaceEditor
         var next = current.ToList();
         if (enable)
         {
+            // "*" (every instance except _Total) replaces specific instances but keeps a ticked aggregate,
+            // and ticking an aggregate such as _Total next to "*" keeps "*".
             if (instance == "*")
-                return ["*"];
-            next.RemoveAll(value => value == "*");
+                return ["*", .. next.Where(InstanceMatcher.IsAggregate)];
+            if (!InstanceMatcher.IsAggregate(instance))
+                next.RemoveAll(value => value == "*");
             if (!next.Contains(instance, StringComparer.OrdinalIgnoreCase))
                 next.Add(instance);
             return next;

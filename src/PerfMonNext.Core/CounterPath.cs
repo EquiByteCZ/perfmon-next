@@ -81,6 +81,25 @@ public static class CounterPathParser
 
 public static class InstanceMatcher
 {
+    /// <summary>
+    /// True for aggregate instances that sum the others: "_Total", "Total", ".NET"'s "_Global_",
+    /// and per-group totals such as "0,_Total" in Processor Information.
+    /// </summary>
+    public static bool IsAggregate(string? instance)
+    {
+        if (string.IsNullOrWhiteSpace(instance))
+            return false;
+        var value = instance.Trim();
+        return value.Equals("_Total", StringComparison.OrdinalIgnoreCase)
+            || value.Equals("Total", StringComparison.OrdinalIgnoreCase)
+            || value.Equals("_Global_", StringComparison.OrdinalIgnoreCase)
+            || value.EndsWith(",_Total", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// "*" means every instance except aggregates (_Total and the like), so a chart does not mix the sum with its parts.
+    /// Tick _Total separately to see it. A prefix such as "chrome*" matches by prefix; anything else must match exactly.
+    /// </summary>
     public static bool Matches(string? pattern, string? instance)
     {
         pattern ??= "";
@@ -88,7 +107,7 @@ public static class InstanceMatcher
         if (pattern.Length == 0)
             return instance.Length == 0;
         if (pattern == "*")
-            return true;
+            return !IsAggregate(instance);
         if (pattern.EndsWith('*') && pattern.Length > 1)
         {
             var prefix = pattern[..^1];

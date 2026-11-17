@@ -42,6 +42,12 @@ public sealed class CounterPathTests
     [InlineData("chrome*", "chrome#2", true)]
     [InlineData("chrome*", "Code", false)]
     [InlineData("_Total", "_total", true)]
+    [InlineData("*", "_Total", false)]
+    [InlineData("*", "Total", false)]
+    [InlineData("*", "0,_Total", false)]
+    [InlineData("*", "_Global_", false)]
+    [InlineData("*", "0,1", true)]
+    [InlineData("*", "TotalCommander", true)]
     [InlineData("", "", true)]
     [InlineData("", "0", false)]
     public void Instance_patterns(string pattern, string instance, bool expected)
@@ -147,6 +153,9 @@ public sealed class WorkspaceTests
         Assert.Equal(["*"], toggled);
         var cleared = WorkspaceEditor.ToggleInstance(["*"], "*", false);
         Assert.Empty(cleared);
+        Assert.Equal(["*", "_Total"], WorkspaceEditor.ToggleInstance(["C:", "_Total"], "*", true));
+        Assert.Equal(["*", "_Total"], WorkspaceEditor.ToggleInstance(["*"], "_Total", true));
+        Assert.Equal(["C:"], WorkspaceEditor.ToggleInstance(["*"], "C:", true));
     }
 
     [Fact]

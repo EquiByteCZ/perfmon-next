@@ -18,6 +18,7 @@ PerfMon Next is an open-source Windows desktop app for watching performance coun
 - Make any chart taller or shorter by dragging its bottom edge (double-click the edge to reset); heights are saved with the workspace
 - Bulk work in the series table: multi-select rows, then **Hide**, **Show**, **Show only**, or **Remove** them (also on the right-click menu; **Space** toggles, **Delete** removes), or **Remove all** to start over with the same machines
 - Bulk selection in the picker: **All** / **None**, Shift-click ranges, **Ctrl+A**, and an instance filter
+- **Every instance** (`*`) and **All** skip `_Total` and other aggregate totals, so the sum is not drawn next to its parts; tick `_Total` separately if you want it
 - Add a single **server**, or a whole failover **cluster**: type the cluster name, pick from the discovered node list (all ticked by default), and every node is added and labelled with its cluster
 - Searchable counter picker with explain text, a built-in starter catalog, and **Add path** for pasted PerfMon-style paths
 - Several machines in one workspace, optional alternate credentials (passwords stay on this PC, never in the workspace file)

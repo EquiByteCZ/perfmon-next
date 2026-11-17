@@ -847,7 +847,9 @@ public partial class MainViewModel : ObservableObject
     private void SelectNoCounters() => SetCountersChecked(Counters.ToList(), false);
 
     [RelayCommand]
-    private void SelectAllInstances() => SetInstancesChecked(Instances.ToList(), true);
+    private void SelectAllInstances() =>
+        // "All" means every real instance; _Total and other aggregates stay as they are.
+        SetInstancesChecked(Instances.Where(row => !InstanceMatcher.IsAggregate(row.Name)).ToList(), true);
 
     [RelayCommand]
     private void SelectNoInstances() => SetInstancesChecked(Instances.ToList(), false);
@@ -1130,7 +1132,7 @@ public partial class MainViewModel : ObservableObject
         var selected = WorkspaceEditor.InstancesFor(_workspace, CurrentScopeId, SelectedSet.Name, SelectedCounter.Name);
         var filter = InstanceFilter.Trim();
         if (string.IsNullOrEmpty(filter) && (SelectedSet.MultiInstance || SelectedSet.Instances.Count > 0))
-            AddInstance("*", "*   every instance", selected);
+            AddInstance("*", "*   every instance (except _Total)", selected);
         if (string.IsNullOrEmpty(filter) && !SelectedSet.MultiInstance && SelectedSet.Instances.Count == 0)
             AddInstance("", "(single instance)", selected);
         foreach (var instance in SelectedSet.Instances)
