@@ -180,6 +180,29 @@ public static class ChartHover
 {
     public const int MaxRows = 12;
 
+    /// <summary>Hide a series in the card when its nearest sample is more than this many sample intervals away.</summary>
+    public const double MaxGapIntervals = 2;
+
+    /// <summary>Typical spacing of a series: the median gap between its last (up to 32) samples.</summary>
+    public static double TypicalStep(IReadOnlyList<double> xs)
+    {
+        if (xs.Count < 2)
+            return 0;
+        var start = Math.Max(1, xs.Count - 32);
+        var gaps = new List<double>();
+        for (var i = start; i < xs.Count; i++)
+        {
+            var gap = xs[i] - xs[i - 1];
+            if (gap > 0 && double.IsFinite(gap))
+                gaps.Add(gap);
+        }
+
+        if (gaps.Count == 0)
+            return 0;
+        gaps.Sort();
+        return gaps[gaps.Count / 2];
+    }
+
     public static int Nearest(IReadOnlyList<double> xs, double x)
     {
         if (xs.Count == 0)
@@ -216,6 +239,11 @@ public static class ChartHover
             var index = Nearest(series.Xs, x);
             if (index < 0)
                 continue;
+            var step = TypicalStep(series.Xs);
+            // One-sample series: allow 2 s either side.
+            var tolerance = step > 0 ? step * MaxGapIntervals : 2.0 / 86_400;
+            if (Math.Abs(series.Xs[index] - x) > tolerance * (1 + 1e-9))
+                continue;
             if (snapped is null || Math.Abs(series.Xs[index] - x) < Math.Abs(snapped.Value - x))
                 snapped = series.Xs[index];
             var shown = series.Ys[index];
@@ -224,7 +252,7 @@ public static class ChartHover
             rows.Add(new HoverRow(series.Name + ScaleFormat.Suffix(series.Scale), series.Color, raw, text));
         }
 
-        if (snapped is not double time)
+        if (snapped is not double time || rows.Count == 0)
             return null;
         var hidden = Math.Max(0, rows.Count - MaxRows);
         return new HoverInfo(time, DateTime.FromOADate(time), rows.Take(MaxRows).ToList(), hidden);

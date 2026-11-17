@@ -232,6 +232,36 @@ try {
     } catch {
         Write-Log "Series menu automation failed: $_"
     }
+
+    # About window (modal): invoke the About button, then capture the dialog's own window.
+    try {
+        [NativeShot]::SetForegroundWindow($hwnd) | Out-Null
+        $root = Get-AutomationWindow $hwnd
+        $aboutCond = New-Object System.Windows.Automation.PropertyCondition (
+            [System.Windows.Automation.AutomationElement]::NameProperty, "About")
+        $about = $root.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $aboutCond)
+        if ($about) {
+            $about.SetFocus()
+            [System.Windows.Forms.SendKeys]::SendWait(" ")
+            Start-Sleep -Seconds 2
+            $dlg = [System.Windows.Automation.AutomationElement]::RootElement.FindFirst(
+                [System.Windows.Automation.TreeScope]::Descendants,
+                (New-Object System.Windows.Automation.PropertyCondition ([System.Windows.Automation.AutomationElement]::NameProperty, "About PerfMon Next")))
+            if ($dlg) {
+                $dh = [IntPtr]$dlg.Current.NativeWindowHandle
+                $aboutPath = Join-Path $OutputDir "about.png"
+                [NativeShot]::CaptureScreen($dh, $aboutPath)
+                Write-Log "Wrote $aboutPath"
+                [System.Windows.Forms.SendKeys]::SendWait("{ESC}")
+            } else {
+                Write-Log "About dialog not found."
+            }
+        } else {
+            Write-Log "About button not found."
+        }
+    } catch {
+        Write-Log "About capture failed: $_"
+    }
 } finally {
     try {
         if ($proc -and -not $proc.HasExited) { $proc.CloseMainWindow() | Out-Null }

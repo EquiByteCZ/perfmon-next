@@ -33,6 +33,7 @@
         <Button Content="New" Style="{StaticResource QuietButton}" Command="{Binding NewWorkspaceCommand}"/>
         <Button Content="Export CSV" Style="{StaticResource QuietButton}" Click="Export_Click"/>
         <Button Content="Import" Style="{StaticResource QuietButton}" Click="Import_Click"/>
+        <Button Content="About" Style="{StaticResource QuietButton}" Click="About_Click" ToolTip="Version, license, and who builds PerfMon Next."/>
       </WrapPanel>
     </DockPanel>
 

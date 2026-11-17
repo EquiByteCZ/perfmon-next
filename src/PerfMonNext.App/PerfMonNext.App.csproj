@@ -7,7 +7,9 @@
     <RootNamespace>PerfMonNext</RootNamespace>
     <AssemblyName>PerfMonNext</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>0.3.4</Version>
+    <Version>0.3.5</Version>
+    <Company>EquiByte s.r.o.</Company>
+    <Copyright>Copyright (c) 2026 EquiByte s.r.o. MIT License.</Copyright>
     <Product>PerfMon Next</Product>
     <Description>Multi-machine Windows performance counter monitor.</Description>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
@@ -19,5 +21,8 @@
     <ProjectReference Include="..\PerfMonNext.Windows\PerfMonNext.Windows.csproj" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="ScottPlot.WPF" Version="5.0.55" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Assets\equibyte-logo.png" />
   </ItemGroup>
 </Project>

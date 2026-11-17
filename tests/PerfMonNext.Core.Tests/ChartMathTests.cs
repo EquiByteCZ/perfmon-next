@@ -152,6 +152,24 @@ public sealed class ChartMathTests
     }
 
     [Fact]
+    public void Hover_shows_nothing_far_from_any_sample()
+    {
+        var frame = Assert.Single(ChartFrames.Build([Snap("s", "Bytes/sec", 1, 2, 3)], ChartGrouping.ByCounter, true, TimeSpan.FromMinutes(5)));
+        var xs = frame.Series[0].Xs;
+        var second = 1.0 / 86_400;
+        Assert.NotNull(ChartHover.At(frame, xs[0] - 1.5 * second));
+        Assert.Null(ChartHover.At(frame, xs[0] - 30 * second));
+        Assert.NotNull(ChartHover.At(frame, xs[2] + 1.9 * second));
+    }
+
+    [Fact]
+    public void Typical_step_is_the_median_gap()
+    {
+        Assert.Equal(1, ChartHover.TypicalStep([0, 1, 2, 3, 10]));
+        Assert.Equal(0, ChartHover.TypicalStep([5]));
+    }
+
+    [Fact]
     public void Frame_y_axis_starts_at_zero_for_positive_counters()
     {
         var frame = Assert.Single(ChartFrames.Build([Snap("s", "Bytes/sec", 5, 7, 6)], ChartGrouping.ByCounter, true, null));

@@ -18,6 +18,8 @@ public partial class MainWindow : Window
         DataContext = vm;
     }
 
+    private void About_Click(object sender, RoutedEventArgs e) => new AboutWindow { Owner = this }.ShowDialog();
+
     private void ToggleAddMachine(object sender, RoutedEventArgs e) => _vm.IsAddMachineOpen = !_vm.IsAddMachineOpen;
 
     private async void AddMachine_Click(object sender, RoutedEventArgs e)
